@@ -5,81 +5,84 @@ import { Filter, LayoutGrid, List } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import Header from '@/components/layout/Header';
 import AdCard from '@/components/ads/AdCard';
+import AddAdModal from '@/components/ads/AddAdModal';
 import Badge from '@/components/ui/Badge';
 import { mockAds } from '@/lib/mock-data';
-import type { Platform, AdStatus } from '@/lib/types';
+import type { Ad, Platform, AdStatus } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 type ViewMode = 'grid' | 'list';
 
 const PLATFORMS: (Platform | 'all')[] = ['all', 'facebook', 'instagram', 'tiktok', 'google', 'linkedin'];
-const STATUSES: (AdStatus | 'all')[] = ['all', 'active', 'paused', 'draft', 'completed'];
+const STATUSES:  (AdStatus  | 'all')[] = ['all', 'active', 'paused', 'draft', 'completed'];
 
 export default function LibraryPage() {
-  const [view, setView] = useState<ViewMode>('grid');
-  const [platform, setPlatform] = useState<Platform | 'all'>('all');
-  const [status, setStatus] = useState<AdStatus | 'all'>('all');
-  const [sort, setSort] = useState<'roas' | 'ctr' | 'spend' | 'score' | 'date'>('roas');
+  const [ads, setAds]               = useState<Ad[]>(mockAds);
+  const [showModal, setShowModal]   = useState(false);
+  const [view, setView]             = useState<ViewMode>('grid');
+  const [platform, setPlatform]     = useState<Platform | 'all'>('all');
+  const [status, setStatus]         = useState<AdStatus | 'all'>('all');
+  const [sort, setSort]             = useState<'roas' | 'ctr' | 'spend' | 'score' | 'date'>('roas');
 
   const filtered = useMemo(() => {
-    let ads = [...mockAds];
-    if (platform !== 'all') ads = ads.filter(a => a.platform === platform);
-    if (status !== 'all') ads = ads.filter(a => a.status === status);
-    ads.sort((a, b) => {
-      if (sort === 'roas') return b.metrics.roas - a.metrics.roas;
-      if (sort === 'ctr') return b.metrics.ctr - a.metrics.ctr;
+    let list = [...ads];
+    if (platform !== 'all') list = list.filter(a => a.platform === platform);
+    if (status  !== 'all') list = list.filter(a => a.status  === status);
+    list.sort((a, b) => {
+      if (sort === 'roas')  return b.metrics.roas  - a.metrics.roas;
+      if (sort === 'ctr')   return b.metrics.ctr   - a.metrics.ctr;
       if (sort === 'spend') return b.metrics.spend - a.metrics.spend;
       if (sort === 'score') return (b.aiScore ?? 0) - (a.aiScore ?? 0);
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-    return ads;
-  }, [platform, status, sort]);
+    return list;
+  }, [ads, platform, status, sort]);
+
+  const handleAdd = (newAd: Ad) => {
+    setAds(prev => [newAd, ...prev]);
+  };
 
   return (
     <AppLayout>
       <Header
         title="Ad Library"
-        subtitle={`${filtered.length} ads`}
-        action={{ label: 'Add Ad', onClick: () => {} }}
-        onRefresh={() => {}}
+        subtitle={`${filtered.length} ad${filtered.length !== 1 ? 's' : ''}`}
+        action={{ label: 'Add Ad', onClick: () => setShowModal(true) }}
+        onRefresh={() => setAds(mockAds)}
       />
 
-      <div className="flex-1 p-8 space-y-6">
+      <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
+
         {/* Filter bar */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Platform filter */}
-          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-3">
+          {/* Platform filter — scrollable on mobile */}
+          <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto max-w-full"
+            style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
             {PLATFORMS.map(p => (
               <button key={p} onClick={() => setPlatform(p)}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize',
-                  platform === p ? 'text-white' : 'text-zinc-500 hover:text-zinc-300',
-                )}
+                className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize whitespace-nowrap',
+                  platform === p ? 'text-white' : 'text-zinc-500 hover:text-zinc-300')}
                 style={platform === p ? { background: 'linear-gradient(135deg,#10B981,#059669)' } : {}}>
-                {p === 'all' ? 'All Platforms' : p}
+                {p === 'all' ? 'All' : p}
               </button>
             ))}
           </div>
 
           {/* Status filter */}
-          <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <div className="flex items-center gap-1 p-1 rounded-xl overflow-x-auto max-w-full"
+            style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
             {STATUSES.map(s => (
               <button key={s} onClick={() => setStatus(s)}
-                className={cn(
-                  'px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize',
-                  status === s ? 'text-white' : 'text-zinc-500 hover:text-zinc-300',
-                )}
+                className={cn('px-3 py-1.5 rounded-lg text-xs font-medium transition-all capitalize whitespace-nowrap',
+                  status === s ? 'text-white' : 'text-zinc-500 hover:text-zinc-300')}
                 style={status === s ? { background: 'rgba(16,185,129,0.25)' } : {}}>
-                {s === 'all' ? 'All Status' : s}
+                {s === 'all' ? 'All' : s}
               </button>
             ))}
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
-            {/* Sort */}
-            <select
-              value={sort}
-              onChange={e => setSort(e.target.value as typeof sort)}
+          <div className="sm:ml-auto flex items-center gap-2">
+            <select value={sort} onChange={e => setSort(e.target.value as typeof sort)}
               className="px-3 py-2 rounded-xl text-xs font-medium text-zinc-300 outline-none cursor-pointer"
               style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.07)' }}>
               <option value="roas">Sort: ROAS</option>
@@ -89,38 +92,40 @@ export default function LibraryPage() {
               <option value="date">Sort: Date</option>
             </select>
 
-            {/* View toggle */}
-            <div className="flex p-1 rounded-xl" style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex p-1 rounded-xl"
+              style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
               <button onClick={() => setView('grid')}
-                className={cn('p-1.5 rounded-lg transition-all', view === 'grid' ? 'text-white bg-white/10' : 'text-zinc-600 hover:text-zinc-400')}>
+                className={cn('p-1.5 rounded-lg transition-all',
+                  view === 'grid' ? 'text-white bg-white/10' : 'text-zinc-600 hover:text-zinc-400')}>
                 <LayoutGrid size={14} />
               </button>
               <button onClick={() => setView('list')}
-                className={cn('p-1.5 rounded-lg transition-all', view === 'list' ? 'text-white bg-white/10' : 'text-zinc-600 hover:text-zinc-400')}>
+                className={cn('p-1.5 rounded-lg transition-all',
+                  view === 'list' ? 'text-white bg-white/10' : 'text-zinc-600 hover:text-zinc-400')}>
                 <List size={14} />
               </button>
             </div>
           </div>
         </div>
 
-        {/* Stats row */}
+        {/* Stats row — dynamic from current ads state */}
         <div className="flex gap-4 flex-wrap">
           {[
-            { label: 'Active',    count: mockAds.filter(a => a.status === 'active').length,    color: 'emerald' as const },
-            { label: 'Paused',    count: mockAds.filter(a => a.status === 'paused').length,    color: 'amber'   as const },
-            { label: 'Draft',     count: mockAds.filter(a => a.status === 'draft').length,     color: 'zinc'    as const },
-            { label: 'Completed', count: mockAds.filter(a => a.status === 'completed').length, color: 'cyan'    as const },
+            { label: 'Active',    count: ads.filter(a => a.status === 'active').length,    color: 'emerald' as const },
+            { label: 'Paused',    count: ads.filter(a => a.status === 'paused').length,    color: 'amber'   as const },
+            { label: 'Draft',     count: ads.filter(a => a.status === 'draft').length,     color: 'zinc'    as const },
+            { label: 'Completed', count: ads.filter(a => a.status === 'completed').length, color: 'cyan'    as const },
           ].map(({ label, count, color }) => (
             <Badge key={label} variant={color} dot>{count} {label}</Badge>
           ))}
         </div>
 
-        {/* Grid */}
+        {/* Grid / List */}
         {filtered.length > 0 ? (
-          <div className={cn(
-            'grid gap-5',
-            view === 'grid' ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4' : 'grid-cols-1',
-          )}>
+          <div className={cn('grid gap-5',
+            view === 'grid'
+              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+              : 'grid-cols-1')}>
             {filtered.map((ad, i) => (
               <AdCard key={ad.id} ad={ad} delay={i * 40} />
             ))}
@@ -137,6 +142,14 @@ export default function LibraryPage() {
           </div>
         )}
       </div>
+
+      {/* Modal */}
+      {showModal && (
+        <AddAdModal
+          onClose={() => setShowModal(false)}
+          onAdd={handleAdd}
+        />
+      )}
     </AppLayout>
   );
 }

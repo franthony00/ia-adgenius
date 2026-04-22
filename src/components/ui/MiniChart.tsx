@@ -13,15 +13,21 @@ export default function MiniChart({ data, color = '#8B5CF6', height = 40, type =
   const range = max - min || 1;
   const w = 200;
   const h = height;
-  const pad = 2;
+
+  // Padding to prevent lines/dots from being clipped at the edges
+  const padX = 5;
+  const padY = 5;
+  const innerW = w - padX * 2;
+  const innerH = h - padY * 2;
 
   if (type === 'bar') {
-    const barW = (w - pad * (data.length - 1)) / data.length;
+    const gap = 2;
+    const barW = (innerW - gap * (data.length - 1)) / data.length;
     return (
-      <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+      <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: 'block', overflow: 'hidden' }}>
         {data.map((v, i) => {
-          const barH = ((v - min) / range) * (h - 4) + 4;
-          const x = i * (barW + pad);
+          const barH = ((v - min) / range) * innerH + padY;
+          const x = padX + i * (barW + gap);
           const isLast = i === data.length - 1;
           return (
             <rect key={i} x={x} y={h - barH} width={barW} height={barH}
@@ -33,25 +39,23 @@ export default function MiniChart({ data, color = '#8B5CF6', height = 40, type =
     );
   }
 
-  // Line chart
-  const points = data.map((v, i) => {
-    const x = (i / (data.length - 1)) * w;
-    const y = h - ((v - min) / range) * (h - 4) - 2;
-    return `${x},${y}`;
-  }).join(' ');
+  // Line chart — map data into the padded coordinate space
+  const mapX = (i: number) => padX + (i / (data.length - 1)) * innerW;
+  const mapY = (v: number) => padY + innerH - ((v - min) / range) * innerH;
+
+  const points = data.map((v, i) => `${mapX(i)},${mapY(v)}`).join(' ');
 
   const areaPoints = [
-    `0,${h}`,
-    ...data.map((v, i) => {
-      const x = (i / (data.length - 1)) * w;
-      const y = h - ((v - min) / range) * (h - 4) - 2;
-      return `${x},${y}`;
-    }),
-    `${w},${h}`,
+    `${mapX(0)},${h - padY}`,
+    ...data.map((v, i) => `${mapX(i)},${mapY(v)}`),
+    `${mapX(data.length - 1)},${h - padY}`,
   ].join(' ');
 
+  const lastX = mapX(data.length - 1);
+  const lastY = mapY(data[data.length - 1]);
+
   return (
-    <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+    <svg width="100%" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ display: 'block', overflow: 'hidden' }}>
       <defs>
         <linearGradient id={`grad-${color.replace('#','')}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />
@@ -60,12 +64,9 @@ export default function MiniChart({ data, color = '#8B5CF6', height = 40, type =
       </defs>
       <polygon points={areaPoints} fill={`url(#grad-${color.replace('#','')})`} />
       <polyline points={points} fill="none" stroke={color} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
-      {/* Last point dot */}
-      {data.length > 0 && (() => {
-        const lastX = w;
-        const lastY = h - ((data[data.length-1] - min) / range) * (h - 4) - 2;
-        return <circle cx={lastX} cy={lastY} r="2.5" fill={color} />;
-      })()}
+      {data.length > 0 && (
+        <circle cx={lastX} cy={lastY} r="2.5" fill={color} />
+      )}
     </svg>
   );
 }

@@ -33,10 +33,10 @@ export default function DashboardPage() {
         onRefresh={() => setRefreshKey(k => k + 1)}
       />
 
-      <div className="flex-1 p-8 space-y-8">
+      <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
 
         {/* ── Hero KPI strip ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           <MetricCard
             label="Total Spend" value={formatCurrency(stats.totalSpend, true)}
             subValue="7 days" trend={8.4} accent="cyan"
@@ -69,7 +69,7 @@ export default function DashboardPage() {
                 <h2 className="text-sm font-semibold text-white">Revenue vs. Spend</h2>
                 <p className="text-xs text-zinc-500 mt-0.5">Last 7 days</p>
               </div>
-              <div className="flex gap-4 text-xs">
+              <div className="flex flex-wrap gap-3 text-xs">
                 <span className="flex items-center gap-1.5 text-emerald-400">
                   <span className="w-2 h-2 rounded-full bg-emerald-400" />Revenue
                 </span>
@@ -78,9 +78,9 @@ export default function DashboardPage() {
                 </span>
               </div>
             </div>
-            <div className="relative h-28">
+            <div className="relative h-28 overflow-hidden">
               <MiniChart data={stats.revenueTrend} color="#10B981" height={112} />
-              <div className="absolute inset-0 top-4 opacity-40">
+              <div className="absolute inset-0 opacity-40">
                 <MiniChart data={stats.spendTrend} color="#52525b" height={112} />
               </div>
             </div>
@@ -139,17 +139,17 @@ export default function DashboardPage() {
                       <p className="text-xs font-semibold text-white truncate">{ad.name}</p>
                       <p className="text-[10px] text-zinc-500 truncate">{ad.campaign}</p>
                     </div>
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0">
                       <div className="text-right">
                         <p className="text-xs font-bold text-emerald-400">{formatMultiplier(ad.metrics.roas)}</p>
                         <p className="text-[10px] text-zinc-600">ROAS</p>
                       </div>
-                      <div className="text-right">
+                      <div className="hidden sm:block text-right">
                         <p className="text-xs font-bold text-white">{formatPercent(ad.metrics.ctr)}</p>
                         <p className="text-[10px] text-zinc-600">CTR</p>
                       </div>
                       {ad.aiScore && (
-                        <div className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg"
+                        <div className="hidden sm:flex items-center gap-0.5 px-1.5 py-0.5 rounded-lg"
                           style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)' }}>
                           <Star size={9} className="text-amber-400 fill-amber-400" />
                           <span className="text-[10px] font-bold text-amber-400">{ad.aiScore}</span>
@@ -193,18 +193,18 @@ export default function DashboardPage() {
 
         {/* ── AI Insight banner ── */}
         {latestAnalysis && (
-          <div className="rounded-2xl p-6 fade-in-up"
+          <div className="rounded-2xl p-4 sm:p-6 fade-in-up"
             style={{
               background: 'linear-gradient(135deg, rgba(16,185,129,0.1) 0%, rgba(5,150,105,0.05) 100%)',
               border: '1px solid rgba(16,185,129,0.2)',
             }}>
-            <div className="flex items-start gap-4">
+            <div className="flex flex-col sm:flex-row items-start gap-4">
               <div className="w-10 h-10 rounded-2xl flex items-center justify-center shrink-0"
                 style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}>
                 <Lightbulb size={18} className="text-white" />
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex flex-wrap items-center gap-2 mb-1">
                   <h3 className="text-sm font-semibold text-white">Latest AI Insight</h3>
                   <Badge variant="emerald">Score: {latestAnalysis.overallScore}/100</Badge>
                   <span className="text-xs text-zinc-600">{latestAnalysis.adName}</span>
@@ -215,7 +215,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-zinc-600 mt-1.5">Top recommendation: {latestAnalysis.recommendations[0]}</p>
               </div>
               <Link href="/analysis"
-                className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
+                className="self-start sm:self-auto shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90"
                 style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}>
                 View Full Analysis <ArrowRight size={14} />
               </Link>
@@ -224,7 +224,7 @@ export default function DashboardPage() {
         )}
 
         {/* ── Summary row ── */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 lg:gap-4">
           {[
             { label: 'Conversions',     value: formatNumber(stats.totalConversions),          icon: <Users size={14} />,    color: '#10B981' },
             { label: 'Impressions',     value: formatNumber(stats.totalImpressions, true),    icon: <Activity size={14} />, color: '#22D3EE' },

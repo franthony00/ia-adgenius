@@ -45,10 +45,10 @@ export default function HistoryPage() {
     <AppLayout>
       <Header title="History" subtitle="Complete record of analyses, variations, and ad changes" onRefresh={() => {}} />
 
-      <div className="flex-1 p-8 space-y-8">
+      <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
 
         {/* Summary cards */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
           {SUMMARY.map(({ label, value, icon, color, border, link }) => (
             <Link key={label} href={link}>
               <div className="rounded-2xl p-5 cursor-pointer transition-all hover:-translate-y-0.5 fade-in-up"
@@ -107,9 +107,9 @@ export default function HistoryPage() {
                       </div>
 
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="flex items-center gap-2 mb-0.5">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
                               <p className="text-sm font-semibold text-white">{entry.title}</p>
                               <Badge variant={meta.badge}>{meta.label}</Badge>
                               {entry.score !== undefined && (

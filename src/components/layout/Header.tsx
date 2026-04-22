@@ -23,16 +23,16 @@ export default function Header({ title, subtitle, action, onRefresh }: HeaderPro
 
   return (
     <header
-      className="sticky top-0 z-30 flex items-center gap-4 px-8 py-4"
+      className="sticky top-0 z-30 flex items-center gap-3 px-4 lg:px-8 py-4"
       style={{
         background: 'rgba(11,11,15,0.88)',
         backdropFilter: 'blur(20px)',
         borderBottom: '1px solid rgba(255,255,255,0.06)',
       }}
     >
-      {/* Title */}
-      <div className="flex-1 min-w-0">
-        <h1 className="text-lg font-bold text-white truncate">{title}</h1>
+      {/* Title — extra left padding on mobile to clear the hamburger button */}
+      <div className="flex-1 min-w-0 pl-10 lg:pl-0">
+        <h1 className="text-base lg:text-lg font-bold text-white truncate">{title}</h1>
         {subtitle && <p className="text-xs mt-0.5" style={{ color: '#9CA3AF' }}>{subtitle}</p>}
       </div>
 
@@ -75,11 +75,11 @@ export default function Header({ title, subtitle, action, onRefresh }: HeaderPro
       {action && (
         <button
           onClick={action.onClick}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95"
+          className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 shrink-0"
           style={{ background: 'linear-gradient(135deg,#10B981,#059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.25)' }}
         >
           {action.icon ?? <Plus size={15} />}
-          {action.label}
+          <span className="hidden sm:inline">{action.label}</span>
         </button>
       )}
 

@@ -42,6 +42,10 @@ export default function GeneratorPage() {
   const [rejectedIds, setRejectedIds] = useState<Set<string>>(new Set());
 
   const generate = async () => {
+    // Limpiar estado anterior antes de empezar
+    setResults([]);
+    setApprovedIds(new Set());
+    setRejectedIds(new Set());
     setStep('generating');
     setProgress(0);
     for (let i = 0; i < LOADING_MSGS.length; i++) {
@@ -49,7 +53,6 @@ export default function GeneratorPage() {
       setProgress(Math.round(((i + 1) / LOADING_MSGS.length) * 100));
       await sleep(500 + Math.random() * 300);
     }
-    // Return mock variations filtered by selected ad (or use first 2 if none)
     const matching = mockVariations.filter(v => v.originalAdId === selectedAd.id);
     const toShow = matching.length > 0 ? matching.slice(0, count) : mockVariations.slice(0, count);
     setResults(toShow.map(v => ({ ...v, status: 'pending' })));
@@ -79,7 +82,7 @@ export default function GeneratorPage() {
         onRefresh={() => { setStep('config'); setResults([]); setApprovedIds(new Set()); setRejectedIds(new Set()); }}
       />
 
-      <div className="flex-1 p-8 space-y-8">
+      <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
 
         {/* ── Config ── */}
         {(step === 'config' || step === 'results') && (
@@ -146,12 +149,17 @@ export default function GeneratorPage() {
               <div>
                 <p className="text-xs text-zinc-500 mb-2">AI Model</p>
                 <div className="space-y-1.5">
-                  {(['claude-3-5-sonnet', 'claude-opus-4', 'gpt-4o'] as AIModel[]).map(m => (
+                  {(['claude-3-5-sonnet', 'claude-opus-4', 'gpt-4o', 'gemini-1.5-pro'] as AIModel[]).map(m => (
                     <button key={m} onClick={() => setModel(m)}
                       className={cn('w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all border',
                         model === m ? 'text-emerald-300 border-emerald-500/25' : 'text-zinc-500 border-white/5 hover:text-zinc-300')}
                       style={model === m ? { background: 'rgba(16,185,129,0.08)' } : {}}>
-                      <span>{m}</span>
+                      <span>{{
+                        'claude-3-5-sonnet': 'Claude 3.5 Sonnet',
+                        'claude-opus-4':     'Claude Opus 4',
+                        'gpt-4o':            'GPT-4o',
+                        'gemini-1.5-pro':    'Gemini 1.5 Pro',
+                      }[m]}</span>
                       {model === m && <Check size={11} className="text-emerald-400" />}
                     </button>
                   ))}
