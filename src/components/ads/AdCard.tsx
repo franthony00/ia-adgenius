@@ -1,6 +1,6 @@
 'use client';
 
-import Image from 'next/image';
+import SafeAdImage from '@/components/ui/SafeAdImage';
 import Link from 'next/link';
 import { TrendingUp, Eye, MousePointer, Star } from 'lucide-react';
 import type { Ad } from '@/lib/types';
@@ -37,7 +37,7 @@ export default function AdCard({ ad, delay = 0 }: AdCardProps) {
 
         {/* Image */}
         <div className="relative h-44 overflow-hidden">
-          <Image src={ad.imageUrl} alt={ad.name} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
+          <SafeAdImage src={ad.imageUrl} alt={ad.name} fill className="object-cover transition-transform duration-500 group-hover:scale-105" />
           <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.1) 0%,rgba(8,8,15,0.85) 100%)' }} />
 
           {/* Platform badge */}

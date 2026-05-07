@@ -108,7 +108,7 @@ function generateId() {
   return `ad_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-const PLACEHOLDER_IMAGE = 'https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?w=800&q=80';
+const PLACEHOLDER_IMAGE = '/ads/tech.svg';
 
 export default function AddAdModal({ onClose, onAdd }: AddAdModalProps) {
   const [form, setForm] = useState<FormState>({

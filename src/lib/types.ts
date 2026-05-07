@@ -4,7 +4,11 @@ export type AdStatus = 'active' | 'paused' | 'completed' | 'draft';
 export type AIModel = 'claude-3-5-sonnet' | 'claude-opus-4' | 'gpt-4o' | 'gemini-1.5-pro';
 export type PerformanceLevel = 'high' | 'medium' | 'low';
 export type ImpactType = 'positive' | 'negative' | 'neutral';
-export type VariationStatus = 'pending' | 'testing' | 'approved' | 'rejected';
+export type VariationStatus = 'pending' | 'testing' | 'approved' | 'rejected' | 'draft';
+export type SalesAngle =
+  | 'Emocional' | 'Directa' | 'Urgencia' | 'Oferta'
+  | 'Autoridad' | 'Problema/Solución' | 'Curiosidad'
+  | 'Social Proof' | 'UGC';
 
 // ─── Metrics ─────────────────────────────────────────────────────────────────
 export interface AdMetrics {
@@ -88,7 +92,11 @@ export interface AdVariation {
   imagePrompt: string;
   imageUrl: string;
   predictedCTR: number;
+  predictedCPC?: number;
   predictedROAS: number;
+  confidence?: number;           // 0–100
+  angle?: SalesAngle;
+  recommendedPlatform?: Platform;
   status: VariationStatus;
   model: AIModel;
   rationale: string;
@@ -124,6 +132,141 @@ export interface DashboardStats {
   spendTrend: number[];    // last 7 days
   revenueTrend: number[];
   ctaTrend: number[];
+  // Extended KPIs
+  campaignsRunning: number;
+  variationsTested: number;
+  winningAds: number;
+  estimatedAvgROAS: number;
+  realAvgROAS: number;
+}
+
+// ─── Platform Mix ─────────────────────────────────────────────────────────────
+export interface PlatformMixItem {
+  platform: Platform;
+  spend: number;
+  pct: number;
+  roas: number;
+  ctr: number;
+}
+
+// ─── Performance Loop ─────────────────────────────────────────────────────────
+export type LoopStage = 'generate' | 'test' | 'measure' | 'learn' | 'improve';
+export type RecommendationType =
+  | 'scale' | 'pause' | 'test_cta' | 'test_copy'
+  | 'duplicate' | 'monitor';
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+
+export interface PerformanceLoopEntry {
+  id: string;
+  adId: string;
+  adName: string;
+  stage: LoopStage;
+  projectedCTR: number;
+  realCTR?: number;
+  projectedROAS: number;
+  realROAS?: number;
+  recommendation: string;
+  recommendationType: RecommendationType;
+  confidence: ConfidenceLevel;
+  daysActive: number;
+}
+
+// ─── AI Recommendation ────────────────────────────────────────────────────────
+export type RecommendationImpact = 'high' | 'medium' | 'low';
+
+export interface AIRecommendation {
+  id: string;
+  adId?: string;
+  adName?: string;
+  type: RecommendationType;
+  title: string;
+  description: string;
+  impact: RecommendationImpact;
+  confidence: number;   // 0-100
+  metric?: string;
+  metricValue?: string;
+}
+
+// ─── Ad Platform Integrations ────────────────────────────────────────────────
+export type AdIntegrationPlatform = 'meta' | 'google' | 'tiktok' | 'linkedin' | 'pinterest';
+export type PlatformConnectionStatus = 'connected' | 'disconnected' | 'error' | 'syncing';
+
+export interface PlatformAccount {
+  id: string;
+  platform: AdIntegrationPlatform;
+  name: string;
+  accountId: string;
+  connected: boolean;
+  status: PlatformConnectionStatus;
+  connectedSince?: string;
+  lastSync?: string;
+  tokenExpiresAt?: string;
+  daysUntilExpiry?: number;
+  adsImported: number;
+  campaignsImported: number;
+  currency: string;
+  timezone: string;
+}
+
+export interface ImportedCampaign {
+  id: string;
+  platform: AdIntegrationPlatform;
+  name: string;
+  objective: string;
+  status: 'active' | 'paused' | 'ended';
+  dailyBudget: number;
+  totalBudget: number;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  ctr: number;
+  cpc: number;
+  roas: number;
+  estimatedROAS: number;
+  adsCount: number;
+  startDate: string;
+  lastUpdated: string;
+}
+
+export interface PlatformSyncEvent {
+  id: string;
+  platform: AdIntegrationPlatform;
+  status: 'success' | 'error' | 'running';
+  adsImported: number;
+  campaignsImported: number;
+  startedAt: string;
+  finishedAt?: string;
+  note?: string;
+}
+
+export interface PlatformRecommendation {
+  id: string;
+  platform: AdIntegrationPlatform;
+  campaignId?: string;
+  campaignName?: string;
+  type: 'scale' | 'pause' | 'budget_shift' | 'audience' | 'creative';
+  title: string;
+  description: string;
+  impact: 'high' | 'medium' | 'low';
+  confidence: number;
+}
+
+// ─── Pricing Plans ────────────────────────────────────────────────────────────
+export type PlanId     = 'starter' | 'pro' | 'performance' | 'agency' | 'enterprise';
+export type PlanAction = 'current' | 'upgrade' | 'downgrade' | 'contact';
+
+export interface PricingPlan {
+  id: PlanId;
+  name: string;
+  priceMonthly: number | null;   // null = custom/contact
+  priceLabel: string;            // e.g. "US$79/month" or "From US$599/month"
+  shortDesc: string;
+  badge?: string;                // "Current Plan" | "Most Recommended"
+  badgeVariant?: 'emerald' | 'amber';
+  features: string[];
+  action: PlanAction;
+  actionLabel: string;
 }
 
 // ─── History Entry ────────────────────────────────────────────────────────────

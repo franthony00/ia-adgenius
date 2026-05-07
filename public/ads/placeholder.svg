@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="600" height="400" viewBox="0 0 600 400">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f1117;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#070a0f;stop-opacity:1"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="400" fill="url(#bg)"/>
+  <!-- Border frame -->
+  <rect x="1" y="1" width="598" height="398" fill="none" stroke="#ffffff" stroke-opacity="0.06" stroke-width="1"/>
+  <!-- Mountain/landscape icon -->
+  <circle cx="300" cy="180" r="52" fill="none" stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"/>
+  <circle cx="300" cy="180" r="36" fill="none" stroke="#ffffff" stroke-opacity="0.05" stroke-width="1"/>
+  <!-- Image icon: rectangle outline -->
+  <rect x="268" y="158" width="64" height="44" rx="5" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.5"/>
+  <!-- Sun circle inside -->
+  <circle cx="282" cy="170" r="5" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.2"/>
+  <!-- Mountain lines -->
+  <polyline points="268,202 284,180 296,192 310,170 332,202" fill="none" stroke="#ffffff" stroke-opacity="0.18" stroke-width="1.2" stroke-linejoin="round"/>
+  <!-- Label -->
+  <text x="300" y="238" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-size="11" fill="#ffffff" fill-opacity="0.2" letter-spacing="2">NO IMAGE</text>
+</svg>

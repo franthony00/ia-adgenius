@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Filter, LayoutGrid, List } from 'lucide-react';
+import { Filter, LayoutGrid, List, Plus } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import Header from '@/components/layout/Header';
 import AdCard from '@/components/ads/AdCard';
@@ -47,7 +47,16 @@ export default function LibraryPage() {
       <Header
         title="Ad Library"
         subtitle={`${filtered.length} ad${filtered.length !== 1 ? 's' : ''}`}
-        action={{ label: 'Add Ad', onClick: () => setShowModal(true) }}
+        action={
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95 shrink-0"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+          >
+            <Plus size={15} />
+            <span className="hidden sm:inline">Add Ad</span>
+          </button>
+        }
         onRefresh={() => setAds(mockAds)}
       />
 

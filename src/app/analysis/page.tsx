@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Image from 'next/image';
+import SafeAdImage from '@/components/ui/SafeAdImage';
 import {
   Sparkles, TrendingUp, TrendingDown, Lightbulb, Brain,
   Check, AlertTriangle, ArrowRight,
@@ -134,7 +134,7 @@ export default function AnalysisPage() {
                   style={selectedAd.id === ad.id ? { background: 'rgba(16,185,129,0.08)' } : {}}
                 >
                   <div className="relative w-10 h-9 rounded-lg overflow-hidden shrink-0">
-                    <Image src={ad.imageUrl} alt={ad.name} fill className="object-cover" />
+                    <SafeAdImage src={ad.imageUrl} alt={ad.name} fill className="object-cover" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold text-white truncate">{ad.name}</p>
@@ -175,17 +175,10 @@ export default function AnalysisPage() {
               className="w-full py-3 rounded-xl text-sm font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-50"
               style={{ background: 'linear-gradient(135deg,#10B981,#059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.25)' }}
             >
-              {step === 'loading' ? (
-                <span className="inline-flex items-center justify-center gap-2">
-                  <SpinnerIcon />
-                  Analysing...
-                </span>
-              ) : (
-                <span className="inline-flex items-center justify-center gap-2">
-                  <Sparkles size={15} />
-                  Run AI Analysis
-                </span>
-              )}
+              <span className="inline-flex items-center justify-center gap-2">
+                {step === 'loading' ? <SpinnerIcon /> : <Sparkles size={15} />}
+                {step === 'loading' ? 'Analysing...' : 'Run AI Analysis'}
+              </span>
             </button>
           </div>
 
@@ -193,7 +186,7 @@ export default function AnalysisPage() {
           <div className="rounded-2xl overflow-hidden"
             style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
             <div className="relative h-40">
-              <Image src={selectedAd.imageUrl} alt={selectedAd.name} fill className="object-cover opacity-80" />
+              <SafeAdImage src={selectedAd.imageUrl} alt={selectedAd.name} fill className="object-cover opacity-80" />
               <div className="absolute inset-0"
                 style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.2),rgba(8,8,15,0.9))' }} />
             </div>

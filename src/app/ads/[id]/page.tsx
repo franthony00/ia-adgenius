@@ -1,11 +1,11 @@
 'use client';
 
 import { use, useState } from 'react';
-import Image from 'next/image';
+import SafeAdImage from '@/components/ui/SafeAdImage';
 import Link from 'next/link';
 import {
   ArrowLeft, BarChart3, Sparkles, ExternalLink, Star, TrendingUp,
-  TrendingDown, Eye, MousePointer, DollarSign, Users,
+  Eye, MousePointer, DollarSign, Users,
 } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import ScoreRing from '@/components/ui/ScoreRing';
@@ -89,7 +89,7 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
             {/* Image */}
             <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
               <div className="relative h-64">
-                <Image src={ad.imageUrl} alt={ad.name} fill className="object-cover" />
+                <SafeAdImage src={ad.imageUrl} alt={ad.name} fill className="object-cover" />
                 <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0) 40%,rgba(11,11,15,0.85))' }} />
                 <div className="absolute bottom-0 left-0 right-0 p-4">
                   <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded text-white mb-2 inline-block"

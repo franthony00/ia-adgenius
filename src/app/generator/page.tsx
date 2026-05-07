@@ -1,10 +1,11 @@
 'use client';
 
 import { useState, useRef } from 'react';
-import Image from 'next/image';
+import SafeAdImage from '@/components/ui/SafeAdImage';
 import {
   Sparkles, Wand2, RefreshCw, Check, ChevronRight,
-  ImageIcon, FileText, Zap,
+  ImageIcon, FileText, Zap, GitBranch, BarChart2,
+  X, TrendingUp, Info,
 } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import Header from '@/components/layout/Header';
@@ -13,7 +14,7 @@ import ProgressBar from '@/components/ui/ProgressBar';
 import VariationCard from '@/components/ai/VariationCard';
 import { mockAds, mockVariations } from '@/lib/mock-data';
 import { cn, sleep, formatPercent, formatMultiplier } from '@/lib/utils';
-import type { Ad, AIModel, AdVariation } from '@/lib/types';
+import type { Ad, AIModel, AdVariation, SalesAngle, Platform } from '@/lib/types';
 
 type GenerateMode = 'copy' | 'visual' | 'both';
 type Step = 'config' | 'generating' | 'results';
@@ -29,10 +30,7 @@ const LOADING_MSGS = [
   'Finalising output...',
 ];
 
-// ─── Per-ad variation templates ───────────────────────────────────────────────
-// Each ad has up to 4 unique variation templates drawn from its actual
-// headline, copy, platform, CTA, and industry angle.
-
+// ─── Variation template (per ad) ─────────────────────────────────────────────
 interface VariationTemplate {
   headline: string;
   description: string;
@@ -41,21 +39,27 @@ interface VariationTemplate {
   changeType: AdVariation['changeType'];
   rationale: string;
   predictedCTR: number;
+  predictedCPC: number;
   predictedROAS: number;
+  confidence: number;
+  angle: SalesAngle;
+  recommendedPlatform: Platform;
 }
 
+// ─── Per-ad variation pools ───────────────────────────────────────────────────
 const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
-  // ── ad1: FitLife — fitness / facebook / conversions ──────────────────────
+
+  // ── ad1: FitLife — fitness / facebook / conversions ─────────────────────────
   ad1: [
     {
       headline: 'The 20-Minute Workout Secret 50,000 Athletes Swear By',
       description: 'Stop spending 2 hours at the gym for worse results. Our AI coach designs your perfect short session — personalised to your body, goals, and schedule.',
       cta: 'Build My Workout',
-      imagePrompt: 'Split-screen: left shows frustrated person in crowded gym, right shows confident athlete finishing 20-min home workout, bright natural light, authentic UGC style',
+      imagePrompt: 'Split-screen: left frustrated person in crowded gym, right confident athlete finishing 20-min home workout, bright natural light, authentic UGC style',
       changeType: 'both',
       rationale: 'Curiosity hook replaces pain-point framing — tests whether aspiration outperforms frustration for this audience.',
-      predictedCTR: 5.4,
-      predictedROAS: 7.8,
+      predictedCTR: 5.4, predictedCPC: 0.82, predictedROAS: 7.8, confidence: 87,
+      angle: 'Curiosidad', recommendedPlatform: 'facebook',
     },
     {
       headline: 'Stop Wasting Hours at the Gym — 20 Minutes Is All You Need',
@@ -64,8 +68,8 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Real person doing home workout, sweating authentically, natural morning light, phone showing workout app on floor beside them',
       changeType: 'copy',
       rationale: 'Adds time specificity to headline while keeping proven pain-point structure. Low-risk, high-confidence test.',
-      predictedCTR: 5.1,
-      predictedROAS: 7.2,
+      predictedCTR: 5.1, predictedCPC: 0.88, predictedROAS: 7.2, confidence: 91,
+      angle: 'Directa', recommendedPlatform: 'facebook',
     },
     {
       headline: 'Why Are You Still Spending 2 Hours at the Gym?',
@@ -74,22 +78,22 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Overhead shot of athlete checking fitness watch post-20-min session, clean modern home gym, sweat glint on forehead, satisfied expression',
       changeType: 'both',
       rationale: 'Question hook triggers self-reflection — audiences who already waste time in the gym will feel seen immediately.',
-      predictedCTR: 4.9,
-      predictedROAS: 6.9,
+      predictedCTR: 4.9, predictedCPC: 0.96, predictedROAS: 6.9, confidence: 79,
+      angle: 'Problema/Solución', recommendedPlatform: 'facebook',
     },
     {
       headline: 'Stop Wasting Hours at the Gym',
       description: 'Our AI coach builds your perfect 20-min workout. 94% of users see results in 30 days or they get their money back.',
       cta: 'Start Free Trial',
-      imagePrompt: 'Before/after side-by-side of same person: left in cluttered gym looking tired, right at home post-workout looking energised, same outfit, authentic not staged',
+      imagePrompt: 'Before/after side-by-side: same person left in cluttered gym looking tired, right at home post-workout looking energised, same outfit, authentic not staged',
       changeType: 'visual',
       rationale: 'Copy proven — test whether UGC-style before/after visual boosts CTR without touching the winning headline.',
-      predictedCTR: 5.6,
-      predictedROAS: 7.4,
+      predictedCTR: 5.6, predictedCPC: 0.79, predictedROAS: 7.4, confidence: 84,
+      angle: 'Social Proof', recommendedPlatform: 'instagram',
     },
   ],
 
-  // ── ad2: BrewHaven — coffee / instagram / sales ──────────────────────────
+  // ── ad2: BrewHaven — coffee / instagram / sales ──────────────────────────────
   ad2: [
     {
       headline: 'Your Coffee Was Roasted 48 Hours Ago. Most Aren\'t.',
@@ -98,8 +102,8 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Close-up of coffee beans being poured, warm amber light, steam rising, artisan roastery feel, golden hour tones',
       changeType: 'copy',
       rationale: 'Contrast hook makes competitor staleness visceral without naming anyone — creates instant perceived superiority.',
-      predictedCTR: 4.1,
-      predictedROAS: 5.2,
+      predictedCTR: 4.1, predictedCPC: 1.28, predictedROAS: 5.2, confidence: 76,
+      angle: 'Directa', recommendedPlatform: 'instagram',
     },
     {
       headline: 'The Last Coffee Subscription You\'ll Ever Need',
@@ -107,9 +111,9 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       cta: 'Start My Subscription',
       imagePrompt: 'Aesthetic morning flat-lay: coffee mug, BrewHaven bag, open journal, warm window light, Instagram-native composition, cosy tones',
       changeType: 'both',
-      rationale: 'Finality framing ("last subscription") reduces comparison shopping — social proof number anchors credibility.',
-      predictedCTR: 3.8,
-      predictedROAS: 4.9,
+      rationale: 'Finality framing reduces comparison shopping — social proof number anchors credibility.',
+      predictedCTR: 3.8, predictedCPC: 1.42, predictedROAS: 4.9, confidence: 71,
+      angle: 'Emocional', recommendedPlatform: 'instagram',
     },
     {
       headline: 'Your Morning Ritual, Upgraded',
@@ -118,8 +122,8 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Barista pouring latte art in minimalist white mug, cafe counter backdrop blurred, steam rising, warm afternoon light filtering through window',
       changeType: 'visual',
       rationale: 'Original copy wins — test whether an artisan café-style visual outperforms the home-ritual imagery.',
-      predictedCTR: 3.5,
-      predictedROAS: 4.5,
+      predictedCTR: 3.5, predictedCPC: 1.55, predictedROAS: 4.5, confidence: 68,
+      angle: 'Emocional', recommendedPlatform: 'instagram',
     },
     {
       headline: 'What If Your Morning Coffee Was Actually Good?',
@@ -128,32 +132,32 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Person holding coffee mug with both hands, close crop on hands and mug, steam rising, cosy morning light, worn wooden table, simple and intimate',
       changeType: 'both',
       rationale: 'Question hook + discount intro offer to convert new audiences unfamiliar with premium coffee subscriptions.',
-      predictedCTR: 4.3,
-      predictedROAS: 5.6,
+      predictedCTR: 4.3, predictedCPC: 1.19, predictedROAS: 5.6, confidence: 81,
+      angle: 'Oferta', recommendedPlatform: 'facebook',
     },
   ],
 
-  // ── ad3: NovaSole — shoes / tiktok / traffic ─────────────────────────────
+  // ── ad3: NovaSole — shoes / tiktok / traffic ──────────────────────────────────
   ad3: [
     {
       headline: 'Stop Choosing Between Fast and Fresh. NovaSole Does Both.',
       description: 'PRs on Monday. Brunch fits on Saturday. 12K+ runners and streetwear fans agree — this is the last shoe you need. Starting at $129.',
       cta: 'Shop the Drop',
-      imagePrompt: 'Dynamic split: left half track/running action shot, right half urban café scene, same shoe in both, bold graphic transition line, Gen-Z energy',
+      imagePrompt: 'Dynamic split: left track/running action shot, right urban café scene, same shoe in both, bold graphic transition, Gen-Z energy',
       changeType: 'both',
-      rationale: 'Removes the semicolon pause and makes the dual-identity benefit explicit with social proof + price anchor.',
-      predictedCTR: 6.2,
-      predictedROAS: 5.8,
+      rationale: 'Removes pause in original copy and makes the dual-identity benefit explicit with social proof + price anchor.',
+      predictedCTR: 6.2, predictedCPC: 0.64, predictedROAS: 5.8, confidence: 85,
+      angle: 'Directa', recommendedPlatform: 'tiktok',
     },
     {
       headline: 'They Said You Can\'t Have Performance AND Style. We Built the Proof.',
       description: 'NovaSole — fast enough for PRs, clean enough for brunch. 4.9 ⭐ from 12K+ runners. Free 30-day returns.',
       cta: 'See the Drop',
-      imagePrompt: 'TikTok-native vertical video thumbnail: shoe in centre, gradient split background (track texture left, marble texture right), bold sans-serif text overlay',
+      imagePrompt: 'TikTok-native vertical video thumbnail: shoe in centre, gradient split background, bold sans-serif text overlay, high contrast',
       changeType: 'both',
       rationale: 'Contrarian hook challenges a category belief — ideal for TikTok where polarising statements drive comment engagement.',
-      predictedCTR: 6.7,
-      predictedROAS: 6.1,
+      predictedCTR: 6.7, predictedCPC: 0.59, predictedROAS: 6.1, confidence: 88,
+      angle: 'Emocional', recommendedPlatform: 'tiktok',
     },
     {
       headline: 'Fast Enough for PRs. Clean Enough for Brunch.',
@@ -162,22 +166,22 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Slow-motion close-up of NovaSole hitting track then transitioning to cobblestone street, cinematic depth-of-field, golden-hour light, no people',
       changeType: 'visual',
       rationale: 'Winning copy unchanged — test cinematic shoe-focus video against lifestyle imagery to find higher-converting creative format.',
-      predictedCTR: 5.9,
-      predictedROAS: 5.5,
+      predictedCTR: 5.9, predictedCPC: 0.71, predictedROAS: 5.5, confidence: 82,
+      angle: 'Social Proof', recommendedPlatform: 'tiktok',
     },
     {
       headline: 'This Shoe Broke My PR. Then I Wore It to Dinner.',
       description: 'NovaSole — the running shoe the streetwear crowd accidentally adopted. 12K+ ⭐ reviews. Shop the drop before it\'s gone.',
       cta: 'Get Mine Now',
-      imagePrompt: 'UGC-style: phone-camera quality, runner\'s feet on track, cut to same shoes under a restaurant table, candid, raw, TikTok-native aesthetic',
+      imagePrompt: 'UGC-style phone-camera quality: runner\'s feet on track, cut to same shoes under restaurant table, candid, raw, TikTok-native aesthetic',
       changeType: 'both',
-      rationale: 'First-person UGC narrative hook mirrors TikTok storytelling patterns — authentic over polished converts better on this platform.',
-      predictedCTR: 7.1,
-      predictedROAS: 6.3,
+      rationale: 'First-person UGC narrative mirrors TikTok storytelling patterns — authentic over polished converts better on this platform.',
+      predictedCTR: 7.1, predictedCPC: 0.55, predictedROAS: 6.3, confidence: 79,
+      angle: 'UGC', recommendedPlatform: 'tiktok',
     },
   ],
 
-  // ── ad4: GlowLab — skincare / instagram / conversions ────────────────────
+  // ── ad4: GlowLab — skincare / instagram / conversions ───────────────────────
   ad4: [
     {
       headline: 'Start My 21-Day Skin Transformation',
@@ -186,8 +190,8 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Clean flatlay of skincare products with subtle before/after skin texture cards, clinical but warm aesthetic, pastel laboratory backdrop',
       changeType: 'both',
       rationale: 'Moves CTA copy into headline as action-first hook. Free sample offer lowers barrier vs. risk-free purchase.',
-      predictedCTR: 6.8,
-      predictedROAS: 8.1,
+      predictedCTR: 6.8, predictedCPC: 0.71, predictedROAS: 8.1, confidence: 88,
+      angle: 'Oferta', recommendedPlatform: 'instagram',
     },
     {
       headline: 'Dermatologist-Developed. Actually Works. Here\'s the Proof.',
@@ -196,18 +200,18 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Close-up of clear, glowing skin texture, soft natural light, no makeup, clinical white background fading into warm skin tone, high-end editorial feel',
       changeType: 'copy',
       rationale: '"Here\'s the proof" extends the authority claim into a curiosity hook — makes the user lean forward before seeing the body copy.',
-      predictedCTR: 6.4,
-      predictedROAS: 7.9,
+      predictedCTR: 6.4, predictedCPC: 0.79, predictedROAS: 7.9, confidence: 85,
+      angle: 'Autoridad', recommendedPlatform: 'instagram',
     },
     {
       headline: 'Dermatologist-Developed. Actually Works.',
       description: '98% see visible improvement in 21 days. No harsh chemicals. No empty promises. Just science.',
       cta: 'Start My 21-Day Trial',
-      imagePrompt: 'Carousel-style side-by-side: Day 1 vs Day 21 skin texture close-up, clinical lighting, dermatologist\'s gloved hands visible in frame, trust-building aesthetic',
+      imagePrompt: 'Carousel-style side-by-side: Day 1 vs Day 21 skin texture close-up, clinical lighting, dermatologist\'s gloved hands visible, trust-building aesthetic',
       changeType: 'visual',
-      rationale: 'Before/after carousel format on Instagram typically outperforms single-image for skincare — same proven copy, new creative format.',
-      predictedCTR: 7.0,
-      predictedROAS: 8.4,
+      rationale: 'Before/after carousel on Instagram typically outperforms single-image for skincare — same proven copy, new creative format.',
+      predictedCTR: 7.0, predictedCPC: 0.67, predictedROAS: 8.4, confidence: 89,
+      angle: 'Social Proof', recommendedPlatform: 'instagram',
     },
     {
       headline: '"My skin cleared in 14 days." — Real GlowLab Customer',
@@ -216,12 +220,12 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'UGC-style selfie of woman with clear glowing skin, natural bathroom lighting, slight smile, authentic expression, not overly posed or polished',
       changeType: 'both',
       rationale: 'Social proof as headline — quote format on Instagram feels native and disarming, especially for beauty sceptics.',
-      predictedCTR: 6.9,
-      predictedROAS: 8.0,
+      predictedCTR: 6.9, predictedCPC: 0.74, predictedROAS: 8.0, confidence: 83,
+      angle: 'UGC', recommendedPlatform: 'instagram',
     },
   ],
 
-  // ── ad5: Nexus AI — SaaS/B2B / linkedin / leads ──────────────────────────
+  // ── ad5: Nexus AI — SaaS / linkedin / leads ──────────────────────────────────
   ad5: [
     {
       headline: 'Your Competitors Cut Costs 34% Last Year. Did You?',
@@ -229,9 +233,9 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       cta: 'Calculate My ROI',
       imagePrompt: 'Dashboard interface showing cost reduction graph trending up, dark professional UI, boardroom reflection in monitor, confident executive reviewing data',
       changeType: 'both',
-      rationale: 'Competitive contrast hook creates FOMO at the executive level — "your competitors" is more motivating than generic benefit claims on LinkedIn.',
-      predictedCTR: 2.6,
-      predictedROAS: 10.2,
+      rationale: 'Competitive contrast hook creates FOMO at the executive level — more motivating than generic benefit claims on LinkedIn.',
+      predictedCTR: 2.6, predictedCPC: 3.82, predictedROAS: 10.2, confidence: 83,
+      angle: 'Urgencia', recommendedPlatform: 'linkedin',
     },
     {
       headline: 'How Much Revenue Is Your Ops Team Leaving on the Table?',
@@ -239,9 +243,9 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       cta: 'Run My Free Audit',
       imagePrompt: 'Clean B2B illustration: ops workflow diagram with Nexus AI overlaid, green efficiency arrows, minimal design, LinkedIn-native professional aesthetic',
       changeType: 'copy',
-      rationale: 'Original question hook kept — swapping CTA to "Free Audit" raises perceived value over "Calculate" for enterprise decision-makers.',
-      predictedCTR: 2.3,
-      predictedROAS: 9.6,
+      rationale: 'Original question hook kept — swapping CTA to "Free Audit" raises perceived value for enterprise decision-makers.',
+      predictedCTR: 2.3, predictedCPC: 4.10, predictedROAS: 9.6, confidence: 78,
+      angle: 'Oferta', recommendedPlatform: 'linkedin',
     },
     {
       headline: '500 Enterprise Teams. Avg. 34% Cost Reduction. 90 Days.',
@@ -249,23 +253,23 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       cta: 'Calculate My Savings',
       imagePrompt: 'Split infographic: left shows tangled ops workflow (before), right shows clean streamlined flow (after Nexus AI), professional blue-green palette, no clutter',
       changeType: 'both',
-      rationale: 'Data-first headline — leads with proof before the question. Ideal for LinkedIn audiences who are already sceptical of ROI claims.',
-      predictedCTR: 2.8,
-      predictedROAS: 11.0,
+      rationale: 'Data-first headline leads with proof before the question — ideal for LinkedIn audiences sceptical of ROI claims.',
+      predictedCTR: 2.8, predictedCPC: 3.64, predictedROAS: 11.0, confidence: 86,
+      angle: 'Autoridad', recommendedPlatform: 'linkedin',
     },
     {
       headline: 'How Much Revenue Is Your Ops Team Leaving on the Table?',
       description: 'Calculate your savings in 60 seconds. 500+ enterprise teams cut costs by avg. 34% with Nexus AI.',
       cta: 'Calculate My ROI',
-      imagePrompt: 'Executive sitting at glass desk reviewing Nexus AI dashboard on large monitor, city skyline visible through floor-to-ceiling windows, confident posture, professional attire',
+      imagePrompt: 'Executive at glass desk reviewing Nexus AI dashboard on large monitor, city skyline through floor-to-ceiling windows, confident posture, professional attire',
       changeType: 'visual',
       rationale: 'Winning copy unchanged — test executive lifestyle visual against product UI screenshot to identify which trust signal converts enterprise leads faster.',
-      predictedCTR: 2.4,
-      predictedROAS: 9.8,
+      predictedCTR: 2.4, predictedCPC: 3.95, predictedROAS: 9.8, confidence: 80,
+      angle: 'Social Proof', recommendedPlatform: 'linkedin',
     },
   ],
 
-  // ── ad6: Wanderlux — travel / facebook / sales ────────────────────────────
+  // ── ad6: Wanderlux — travel / facebook / sales ──────────────────────────────
   ad6: [
     {
       headline: 'Only 9 Bali Packages Left at $649 — Don\'t Wake Up to Sold Out',
@@ -273,19 +277,19 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       cta: 'Lock My Price Now',
       imagePrompt: 'Aerial drone shot of Bali rice terraces at golden hour, couple in distance on viewing platform, lush greens and warm sky, aspirational and real simultaneously',
       changeType: 'both',
-      rationale: 'Tightens the scarcity number (23→9) and adds consequence ("wake up to sold out") — loss aversion outperforms FOMO at this audience stage.',
-      predictedCTR: 8.9,
-      predictedROAS: 5.1,
+      rationale: 'Tightens the scarcity number and adds consequence — loss aversion outperforms FOMO at this audience stage.',
+      predictedCTR: 8.9, predictedCPC: 0.49, predictedROAS: 5.1, confidence: 82,
+      angle: 'Urgencia', recommendedPlatform: 'facebook',
     },
     {
       headline: '72-Hour Flash Sale: Bali from $649',
       description: 'Only 23 packages left at this price. All-inclusive 7-night escapes with 5-star resorts. Sale ends Sunday.',
       cta: 'Claim My Package',
-      imagePrompt: 'Split: pool infinity edge overlooking Bali jungle on left, package price badge on right with countdown timer overlay, luxury-meets-urgency visual tension',
+      imagePrompt: 'Split: pool infinity edge overlooking Bali jungle on left, package price badge with countdown timer overlay on right, luxury-meets-urgency visual tension',
       changeType: 'visual',
       rationale: 'Original copy kept — test whether a pool/price overlay visual outperforms landscape-only creative at the bottom of the funnel.',
-      predictedCTR: 8.4,
-      predictedROAS: 4.7,
+      predictedCTR: 8.4, predictedCPC: 0.54, predictedROAS: 4.7, confidence: 76,
+      angle: 'Oferta', recommendedPlatform: 'facebook',
     },
     {
       headline: 'You\'re 3 Clicks Away from Bali. $649. 7 Nights. All-In.',
@@ -293,23 +297,23 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       cta: 'Book Before It\'s Gone',
       imagePrompt: 'Close-up of hands typing on laptop with Bali resort pool in soft-focus background — buying intent visual meets aspirational destination',
       changeType: 'both',
-      rationale: 'Process simplification ("3 clicks") reduces perceived friction for fence-sitters — combines ease with urgency without feeling pushy.',
-      predictedCTR: 9.1,
-      predictedROAS: 5.4,
+      rationale: 'Process simplification reduces perceived friction for fence-sitters — combines ease with urgency without feeling pushy.',
+      predictedCTR: 9.1, predictedCPC: 0.47, predictedROAS: 5.4, confidence: 84,
+      angle: 'Directa', recommendedPlatform: 'facebook',
     },
     {
       headline: 'Warning: This Bali Deal Expires in 72 Hours',
       description: 'Flash sale — Bali from $649 all-inclusive. 5-star resorts, private transfers, 7 nights. Only 23 packages remain. Don\'t miss it.',
       cta: 'See the Deal',
-      imagePrompt: 'Bold graphic with Bali temple silhouette at sunset, large price badge, ticking urgency design element, warm amber palette, Facebook feed-stopping composition',
+      imagePrompt: 'Bold graphic with Bali temple silhouette at sunset, large price badge, ticking urgency design element, warm amber palette, feed-stopping composition',
       changeType: 'both',
       rationale: '"Warning" pattern interrupt is contrarian for travel ads — creates a reflexive stop-and-read response in a crowded feed.',
-      predictedCTR: 8.6,
-      predictedROAS: 4.9,
+      predictedCTR: 8.6, predictedCPC: 0.52, predictedROAS: 4.9, confidence: 79,
+      angle: 'Urgencia', recommendedPlatform: 'facebook',
     },
   ],
 
-  // ── ad7: TasteLab — food / tiktok / conversions ───────────────────────────
+  // ── ad7: TasteLab — food / tiktok / conversions ──────────────────────────────
   ad7: [
     {
       headline: 'What If Dinner Actually Impressed People?',
@@ -317,9 +321,9 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       cta: 'Get My First Box',
       imagePrompt: 'TikTok-native: hands plating pasta with tweezers, steam rising, close-up cinematic, warm kitchen lighting, blurred background, aspirational home-chef energy',
       changeType: 'both',
-      rationale: 'Question hook targets social motivation (impressing people) which is more powerful than skill-building on TikTok.',
-      predictedCTR: 5.8,
-      predictedROAS: 4.2,
+      rationale: 'Question hook targets social motivation — impressing people is more powerful than skill-building on TikTok.',
+      predictedCTR: 5.8, predictedCPC: 0.88, predictedROAS: 4.2, confidence: 74,
+      angle: 'Emocional', recommendedPlatform: 'tiktok',
     },
     {
       headline: 'I Made Michelin-Star Pasta in 15 Minutes. Here\'s How.',
@@ -328,18 +332,18 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'UGC phone camera: finished pasta dish on wooden table, natural kitchen light, imperfect but delicious-looking, chopsticks and fork beside plate, real home setting',
       changeType: 'visual',
       rationale: 'Winning copy kept — test authentic phone-cam UGC aesthetic vs. polished food photography on TikTok to see which converts faster.',
-      predictedCTR: 6.1,
-      predictedROAS: 4.5,
+      predictedCTR: 6.1, predictedCPC: 0.81, predictedROAS: 4.5, confidence: 78,
+      angle: 'UGC', recommendedPlatform: 'tiktok',
     },
     {
       headline: 'The Box That Made Me Look Like I Went to Culinary School',
       description: 'Restaurant-grade ingredients. Chef-designed recipes. 15 minutes. TasteLab delivers everything you need to cook like a pro — first box 50% off.',
       cta: 'Try TasteLab',
-      imagePrompt: 'First-person POV: hands opening TasteLab box revealing neatly packaged ingredients, recipe card visible, fresh produce, cinematic unboxing, TikTok vertical format',
+      imagePrompt: 'First-person POV: hands opening TasteLab box revealing neatly packaged ingredients, recipe card visible, fresh produce, cinematic unboxing, TikTok vertical',
       changeType: 'both',
-      rationale: 'Unboxing hook captures TikTok\'s "haul" and "unboxing" culture — high completion rate format for subscription food products.',
-      predictedCTR: 6.4,
-      predictedROAS: 4.8,
+      rationale: 'Unboxing hook captures TikTok "haul" culture — high completion rate format for subscription food products.',
+      predictedCTR: 6.4, predictedCPC: 0.76, predictedROAS: 4.8, confidence: 81,
+      angle: 'Curiosidad', recommendedPlatform: 'tiktok',
     },
     {
       headline: 'I Made Michelin-Star Pasta in 15 Minutes. Here\'s How.',
@@ -348,12 +352,12 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Trending TikTok recipe video thumbnail: ingredients laid out flat on marble, text overlay "15 min Michelin pasta", bold font, warm kitchen tones, viral format',
       changeType: 'visual',
       rationale: 'Recipe-thumbnail format mirrors viral TikTok cooking content — native-feeling creative typically outperforms produced ads 2:1 on this platform.',
-      predictedCTR: 7.0,
-      predictedROAS: 5.2,
+      predictedCTR: 7.0, predictedCPC: 0.71, predictedROAS: 5.2, confidence: 76,
+      angle: 'Social Proof', recommendedPlatform: 'tiktok',
     },
   ],
 
-  // ── ad8: LuxeThread — fashion / instagram / awareness ────────────────────
+  // ── ad8: LuxeThread — fashion / instagram / awareness ─────────────────────
   ad8: [
     {
       headline: 'Your Wardrobe Called. It Wants to Be Curated.',
@@ -361,9 +365,9 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       cta: 'Explore My Edit',
       imagePrompt: 'Minimalist closet rail with curated sustainable luxury pieces, warm accent lighting, white walls, editorial calm — aspirational but achievable',
       changeType: 'both',
-      rationale: 'Personalised hook ("your wardrobe called") mirrors how LuxeThread\'s curation feels — creates ownership before purchase.',
-      predictedCTR: 3.4,
-      predictedROAS: 3.5,
+      rationale: 'Personalised hook mirrors how LuxeThread\'s curation feels — creates ownership before purchase.',
+      predictedCTR: 3.4, predictedCPC: 1.65, predictedROAS: 3.5, confidence: 72,
+      angle: 'Emocional', recommendedPlatform: 'instagram',
     },
     {
       headline: 'Sustainable Doesn\'t Have to Mean Boring.',
@@ -372,8 +376,8 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Model in minimalist sustainable luxury outfit against textured natural backdrop, earth tones, confidence posture, editorial lighting, no busy props',
       changeType: 'both',
       rationale: 'Directly challenges the #1 objection to sustainable fashion — sceptics who click are already pre-qualified.',
-      predictedCTR: 3.2,
-      predictedROAS: 3.3,
+      predictedCTR: 3.2, predictedCPC: 1.71, predictedROAS: 3.3, confidence: 69,
+      angle: 'Directa', recommendedPlatform: 'instagram',
     },
     {
       headline: 'Dress Like You Mean It',
@@ -382,8 +386,8 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Carousel Instagram: each frame a different styled outfit from LuxeThread, consistent warm editorial palette, model and flat-lay alternating, cohesive luxury story',
       changeType: 'visual',
       rationale: 'Proven copy, new format — Instagram carousel with styled outfit series drives saves and profile visits better than single-image awareness ads.',
-      predictedCTR: 3.6,
-      predictedROAS: 3.8,
+      predictedCTR: 3.6, predictedCPC: 1.58, predictedROAS: 3.8, confidence: 74,
+      angle: 'Social Proof', recommendedPlatform: 'instagram',
     },
     {
       headline: 'The Pieces Stylists Actually Wear. Now Available to You.',
@@ -392,13 +396,13 @@ const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
       imagePrompt: 'Behind-the-scenes: stylist\'s own wardrobe rail, handwritten notes on labels, personal feel, sunlight through window — insider access aesthetic',
       changeType: 'both',
       rationale: 'Authority transfer hook — "stylists actually wear" implies insider knowledge, which drives aspiration better than generic luxury claims.',
-      predictedCTR: 3.1,
-      predictedROAS: 3.0,
+      predictedCTR: 3.1, predictedCPC: 1.78, predictedROAS: 3.0, confidence: 66,
+      angle: 'Autoridad', recommendedPlatform: 'instagram',
     },
   ],
 };
 
-// ─── Generate variations for a specific ad ────────────────────────────────────
+// ─── Generate variations ───────────────────────────────────────────────────────
 function generateVariationsForAd(
   ad: Ad,
   mode: GenerateMode,
@@ -407,33 +411,32 @@ function generateVariationsForAd(
 ): AdVariation[] {
   const pool = AD_VARIATION_POOL[ad.id] ?? [];
 
-  // If no templates exist for this ad, create generic ones from its own data
   const templates: VariationTemplate[] = pool.length > 0
     ? pool
-    : [
-        {
-          headline: `${ad.headline} — Proven.`,
-          description: ad.description,
-          cta: ad.cta,
-          imagePrompt: `Professional ad creative for "${ad.name}" — ${ad.platform} format, ${ad.objective} objective`,
-          changeType: 'copy' as const,
-          rationale: 'Adds authority signal to original headline while keeping proven copy structure.',
-          predictedCTR: +(ad.metrics.ctr * 1.1).toFixed(2),
-          predictedROAS: +(ad.metrics.roas * 1.05).toFixed(2),
-        },
-      ];
+    : [{
+        headline: `${ad.headline} — Proven.`,
+        description: ad.description,
+        cta: ad.cta,
+        imagePrompt: `Professional ad creative for "${ad.name}" — ${ad.platform} format, ${ad.objective} objective`,
+        changeType: 'copy' as const,
+        rationale: 'Adds authority signal to original headline while keeping proven copy structure.',
+        predictedCTR: +(ad.metrics.ctr * 1.1).toFixed(2),
+        predictedCPC: +(ad.metrics.cpc * 0.95).toFixed(2),
+        predictedROAS: +(ad.metrics.roas * 1.05).toFixed(2),
+        confidence: 72,
+        angle: 'Directa' as SalesAngle,
+        recommendedPlatform: ad.platform,
+      }];
 
   const now = new Date().toISOString();
 
   return templates.slice(0, count).map((tpl, i): AdVariation => {
-    // Mode filtering: 'copy' uses source image, 'visual' uses source text
-    const headline     = mode === 'visual' ? ad.headline    : tpl.headline;
-    const description  = mode === 'visual' ? ad.description : tpl.description;
-    const cta          = mode === 'visual' ? ad.cta         : tpl.cta;
-    const imageUrl     = ad.imageUrl; // always use source image (no real image gen)
-    const changeType   = mode === 'copy'   ? 'copy'
-                       : mode === 'visual' ? 'visual'
-                       : tpl.changeType;
+    const headline    = mode === 'visual' ? ad.headline    : tpl.headline;
+    const description = mode === 'visual' ? ad.description : tpl.description;
+    const cta         = mode === 'visual' ? ad.cta         : tpl.cta;
+    const changeType  = mode === 'copy'   ? 'copy'
+                      : mode === 'visual' ? 'visual'
+                      : tpl.changeType;
 
     return {
       id: `gen-${ad.id}-${mode}-${i}-${Date.now()}`,
@@ -444,9 +447,13 @@ function generateVariationsForAd(
       description,
       cta,
       imagePrompt: tpl.imagePrompt,
-      imageUrl,
+      imageUrl: ad.imageUrl,
       predictedCTR: tpl.predictedCTR,
+      predictedCPC: tpl.predictedCPC,
       predictedROAS: tpl.predictedROAS,
+      confidence: tpl.confidence,
+      angle: tpl.angle,
+      recommendedPlatform: tpl.recommendedPlatform,
       status: 'pending',
       model,
       rationale: tpl.rationale,
@@ -458,35 +465,82 @@ function generateVariationsForAd(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function GeneratorPage() {
-  const [selectedAd, setSelectedAd]     = useState(mockAds[0]);
-  const [mode, setMode]                 = useState<GenerateMode>('both');
-  const [model, setModel]               = useState<AIModel>('claude-3-5-sonnet');
-  const [count, setCount]               = useState(2);
-  const [step, setStep]                 = useState<Step>('config');
-  const [progress, setProgress]         = useState(0);
-  const [loadMsg, setLoadMsg]           = useState('');
-  const [results, setResults]           = useState<AdVariation[]>([]);
-  const [approvedIds, setApprovedIds]   = useState<Set<string>>(new Set());
-  const [rejectedIds, setRejectedIds]   = useState<Set<string>>(new Set());
-  const runIdRef                        = useRef(0);
+  const [selectedAd, setSelectedAd]   = useState(mockAds[0]);
+  const [mode, setMode]               = useState<GenerateMode>('both');
+  const [model, setModel]             = useState<AIModel>('claude-3-5-sonnet');
+  const [count, setCount]             = useState(2);
+  const [step, setStep]               = useState<Step>('config');
+  const [progress, setProgress]       = useState(0);
+  const [loadMsg, setLoadMsg]         = useState('');
+  const [results, setResults]         = useState<AdVariation[]>([]);
 
+  // Per-variation action state
+  const [usedIds, setUsedIds]         = useState<Set<string>>(new Set());
+  const [draftIds, setDraftIds]       = useState<Set<string>>(new Set());
+  const [abTestIds, setAbTestIds]     = useState<Set<string>>(new Set());
+  const [compareIds, setCompareIds]   = useState<Set<string>>(new Set());
+  const [showCompare, setShowCompare] = useState(false);
+
+  const runIdRef = useRef(0);
+
+  // ── Helpers ──────────────────────────────────────────────────────────────────
   const resetResults = () => {
     setResults([]);
-    setApprovedIds(new Set());
-    setRejectedIds(new Set());
+    setUsedIds(new Set());
+    setDraftIds(new Set());
+    setAbTestIds(new Set());
+    setCompareIds(new Set());
+    setShowCompare(false);
   };
 
   const selectAd = (ad: typeof mockAds[0]) => {
-    // Cancel any in-flight generation and clear previous results
     runIdRef.current++;
     setSelectedAd(ad);
     setStep('config');
     resetResults();
   };
 
+  const getStatus = (id: string): AdVariation['status'] => {
+    if (usedIds.has(id))   return 'approved';
+    if (abTestIds.has(id)) return 'testing';
+    if (draftIds.has(id))  return 'draft';
+    return 'pending';
+  };
+
+  // ── Actions ───────────────────────────────────────────────────────────────────
+  const handleUse = (id: string) => {
+    setUsedIds(s => new Set([...s, id]));
+    setDraftIds(s => { const n = new Set(s); n.delete(id); return n; });
+    setAbTestIds(s => { const n = new Set(s); n.delete(id); return n; });
+  };
+
+  const handleSaveDraft = (id: string) => {
+    if (usedIds.has(id)) return;
+    setDraftIds(s => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  const handleMarkABTest = (id: string) => {
+    if (usedIds.has(id)) return;
+    setAbTestIds(s => new Set([...s, id]));
+    setDraftIds(s => { const n = new Set(s); n.delete(id); return n; });
+  };
+
+  const handleCompare = (id: string) => {
+    setCompareIds(s => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id); else n.add(id);
+      return n;
+    });
+  };
+
+  // ── Generate ──────────────────────────────────────────────────────────────────
   const generate = async () => {
-    const runId = ++runIdRef.current;
-    const adSnapshot = selectedAd; // capture at call time
+    const runId       = ++runIdRef.current;
+    const adSnapshot  = selectedAd;
 
     resetResults();
     setStep('generating');
@@ -497,9 +551,8 @@ export default function GeneratorPage() {
         setLoadMsg(LOADING_MSGS[i]);
         setProgress(Math.round(((i + 1) / LOADING_MSGS.length) * 100));
         await sleep(500 + Math.random() * 300);
-        if (runId !== runIdRef.current) return; // stale run — abort
+        if (runId !== runIdRef.current) return;
       }
-
       const variations = generateVariationsForAd(adSnapshot, mode, count, model);
       if (runId !== runIdRef.current) return;
       setResults(variations);
@@ -509,32 +562,20 @@ export default function GeneratorPage() {
     }
   };
 
-  const approve = (id: string) => {
-    setApprovedIds(s => new Set([...s, id]));
-    setRejectedIds(s => { const n = new Set(s); n.delete(id); return n; });
-  };
-  const reject = (id: string) => {
-    setRejectedIds(s => new Set([...s, id]));
-    setApprovedIds(s => { const n = new Set(s); n.delete(id); return n; });
-  };
-
-  const getStatus = (id: string): AdVariation['status'] => {
-    if (approvedIds.has(id)) return 'approved';
-    if (rejectedIds.has(id)) return 'rejected';
-    return 'pending';
-  };
+  // ── Compare data ──────────────────────────────────────────────────────────────
+  const compareVariations = results.filter(v => compareIds.has(v.id));
 
   return (
     <AppLayout>
       <Header
         title="Variation Generator"
-        subtitle="AI-powered ad copy and creative variations"
+        subtitle="AI-powered A/B variations with projections"
         onRefresh={() => { runIdRef.current++; setStep('config'); resetResults(); }}
       />
 
       <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 lg:space-y-8">
 
-        {/* ── Config ── */}
+        {/* ── Config panel ── */}
         {(step === 'config' || step === 'results') && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
@@ -549,11 +590,13 @@ export default function GeneratorPage() {
                       selectedAd.id === ad.id ? 'border-emerald-500/30' : 'border-transparent hover:bg-white/5')}
                     style={selectedAd.id === ad.id ? { background: 'rgba(16,185,129,0.08)' } : {}}>
                     <div className="relative w-10 h-9 rounded-lg overflow-hidden shrink-0">
-                      <Image src={ad.imageUrl} alt={ad.name} fill className="object-cover" />
+                      <SafeAdImage src={ad.imageUrl} alt={ad.name} fill className="object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-semibold text-white truncate">{ad.name}</p>
-                      <p className="text-[10px] text-zinc-500 capitalize">{ad.platform} · Score: {ad.aiScore ?? '—'}</p>
+                      <p className="text-[10px] text-zinc-500 capitalize">
+                        {ad.platform} · {ad.status === 'draft' ? 'Draft' : `Score: ${ad.aiScore ?? '—'}`}
+                      </p>
                     </div>
                     {selectedAd.id === ad.id && <Check size={12} className="text-emerald-400 shrink-0" />}
                   </button>
@@ -561,7 +604,7 @@ export default function GeneratorPage() {
               </div>
             </div>
 
-            {/* Config options */}
+            {/* Generation settings */}
             <div className="rounded-2xl p-6 space-y-5"
               style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
               <h2 className="text-sm font-semibold text-white">Generation Settings</h2>
@@ -571,9 +614,9 @@ export default function GeneratorPage() {
                 <p className="text-xs text-zinc-500 mb-2">What to generate</p>
                 <div className="grid grid-cols-3 gap-2">
                   {([
-                    { id: 'copy',   label: 'Copy',   icon: <FileText size={13} /> },
+                    { id: 'copy',   label: 'Copy',   icon: <FileText  size={13} /> },
                     { id: 'visual', label: 'Visual', icon: <ImageIcon size={13} /> },
-                    { id: 'both',   label: 'Both',   icon: <Sparkles size={13} /> },
+                    { id: 'both',   label: 'Both',   icon: <Sparkles  size={13} /> },
                   ] as const).map(({ id, label, icon }) => (
                     <button key={id} onClick={() => setMode(id)}
                       className={cn('flex flex-col items-center gap-1.5 p-3 rounded-xl text-xs font-medium transition-all border',
@@ -588,13 +631,13 @@ export default function GeneratorPage() {
               {/* Count */}
               <div>
                 <p className="text-xs text-zinc-500 mb-2">
-                  Number of variations: <span className="text-white font-bold">{count}</span>
+                  Variations: <span className="text-white font-bold">{count}</span>
                 </p>
                 <input type="range" min={1} max={4} value={count}
                   onChange={e => setCount(+e.target.value)}
                   className="w-full accent-emerald-500" />
                 <div className="flex justify-between text-[10px] text-zinc-700 mt-1">
-                  <span>1</span><span>2</span><span>3</span><span>4</span>
+                  {[1,2,3,4].map(n => <span key={n}>{n}</span>)}
                 </div>
               </div>
 
@@ -602,7 +645,7 @@ export default function GeneratorPage() {
               <div>
                 <p className="text-xs text-zinc-500 mb-2">AI Model</p>
                 <div className="space-y-1.5">
-                  {(['claude-3-5-sonnet', 'claude-opus-4', 'gpt-4o', 'gemini-1.5-pro'] as AIModel[]).map(m => (
+                  {(['claude-3-5-sonnet','claude-opus-4','gpt-4o','gemini-1.5-pro'] as AIModel[]).map(m => (
                     <button key={m} onClick={() => setModel(m)}
                       className={cn('w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs transition-all border',
                         model === m ? 'text-emerald-300 border-emerald-500/25' : 'text-zinc-500 border-white/5 hover:text-zinc-300')}
@@ -624,7 +667,7 @@ export default function GeneratorPage() {
             <div className="rounded-2xl overflow-hidden flex flex-col"
               style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
               <div className="relative h-36">
-                <Image src={selectedAd.imageUrl} alt={selectedAd.name} fill className="object-cover opacity-70" />
+                <SafeAdImage src={selectedAd.imageUrl} alt={selectedAd.name} fill className="object-cover opacity-70" />
                 <div className="absolute inset-0"
                   style={{ background: 'linear-gradient(180deg,rgba(0,0,0,0.1),rgba(8,8,15,0.95))' }} />
               </div>
@@ -641,8 +684,7 @@ export default function GeneratorPage() {
                 <button onClick={generate}
                   className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95"
                   style={{ background: 'linear-gradient(135deg,#10B981,#059669)', boxShadow: '0 8px 24px rgba(16,185,129,0.25)' }}>
-                  <Wand2 size={16} />
-                  Generate Variations
+                  <Wand2 size={16} />Generate Variations
                 </button>
               </div>
             </div>
@@ -671,46 +713,205 @@ export default function GeneratorPage() {
         {/* ── Results ── */}
         {step === 'results' && results.length > 0 && (
           <div className="space-y-5 fade-in-up">
-            <div className="flex items-center justify-between">
+
+            {/* Results header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold text-white">{results.length} Variations Generated</h2>
                 <p className="text-xs text-zinc-500 mt-0.5">
-                  Based on {selectedAd.name} · {mode} mode · Review and approve to test
+                  {selectedAd.name} · {mode} mode ·{' '}
+                  {usedIds.size > 0 && <span className="text-emerald-400">{usedIds.size} using </span>}
+                  {abTestIds.size > 0 && <span className="text-blue-400">{abTestIds.size} in A/B </span>}
+                  {draftIds.size > 0 && <span className="text-violet-400">{draftIds.size} drafted </span>}
+                  {usedIds.size === 0 && abTestIds.size === 0 && draftIds.size === 0 && 'Review and act on each variation'}
                 </p>
               </div>
-              <button onClick={generate}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium text-zinc-400 hover:text-white transition-colors"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <RefreshCw size={14} />
-                Regenerate
-              </button>
+              <div className="flex items-center gap-2">
+                {compareIds.size >= 2 && (
+                  <button
+                    onClick={() => setShowCompare(v => !v)}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all"
+                    style={{
+                      background: showCompare ? 'rgba(34,211,238,0.15)' : 'rgba(34,211,238,0.08)',
+                      border: '1px solid rgba(34,211,238,0.3)',
+                      color: '#22D3EE',
+                    }}>
+                    <BarChart2 size={13} />
+                    Compare {compareIds.size}
+                  </button>
+                )}
+                <button onClick={generate}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-medium text-zinc-400 hover:text-white transition-colors"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  <RefreshCw size={13} />Regenerate
+                </button>
+              </div>
             </div>
 
+            {/* Compare panel */}
+            {showCompare && compareVariations.length >= 2 && (
+              <div className="rounded-2xl p-5 fade-in-up"
+                style={{ background: 'rgba(34,211,238,0.04)', border: '1px solid rgba(34,211,238,0.2)' }}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <BarChart2 size={14} className="text-cyan-400" />
+                    <h3 className="text-sm font-semibold text-white">Comparison View</h3>
+                    <Badge variant="cyan">Proyección estimada</Badge>
+                  </div>
+                  <button onClick={() => setShowCompare(false)}
+                    className="text-zinc-600 hover:text-zinc-400 transition-colors">
+                    <X size={14} />
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-xs">
+                    <thead>
+                      <tr>
+                        <td className="text-zinc-600 pb-3 pr-4 w-28">Métrica</td>
+                        {compareVariations.map((v, i) => (
+                          <td key={v.id} className="pb-3 pr-4 min-w-[140px]">
+                            <p className="text-white font-semibold line-clamp-1">{v.headline}</p>
+                            <p className="text-zinc-600 text-[10px] mt-0.5">Variación {i + 1}</p>
+                          </td>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
+                      {[
+                        {
+                          label: 'Ángulo',
+                          render: (v: AdVariation) => v.angle ?? '—',
+                          color: () => '#9CA3AF',
+                        },
+                        {
+                          label: 'Plataforma',
+                          render: (v: AdVariation) => v.recommendedPlatform ?? '—',
+                          color: () => '#9CA3AF',
+                        },
+                        {
+                          label: 'CTA',
+                          render: (v: AdVariation) => v.cta,
+                          color: () => '#6EE7B7',
+                        },
+                        {
+                          label: 'Est. CTR',
+                          render: (v: AdVariation) => formatPercent(v.predictedCTR),
+                          color: (v: AdVariation) => {
+                            const max = Math.max(...compareVariations.map(x => x.predictedCTR));
+                            return v.predictedCTR === max ? '#10B981' : '#9CA3AF';
+                          },
+                        },
+                        {
+                          label: 'Est. CPC',
+                          render: (v: AdVariation) => v.predictedCPC != null ? `$${v.predictedCPC.toFixed(2)}` : '—',
+                          color: (v: AdVariation) => {
+                            const min = Math.min(...compareVariations.map(x => x.predictedCPC ?? 99));
+                            return v.predictedCPC === min ? '#10B981' : '#9CA3AF';
+                          },
+                        },
+                        {
+                          label: 'Est. ROAS',
+                          render: (v: AdVariation) => formatMultiplier(v.predictedROAS),
+                          color: (v: AdVariation) => {
+                            const max = Math.max(...compareVariations.map(x => x.predictedROAS));
+                            return v.predictedROAS === max ? '#10B981' : '#9CA3AF';
+                          },
+                        },
+                        {
+                          label: 'Confianza',
+                          render: (v: AdVariation) => v.confidence != null ? `${v.confidence}%` : '—',
+                          color: (v: AdVariation) => {
+                            const max = Math.max(...compareVariations.map(x => x.confidence ?? 0));
+                            return v.confidence === max ? '#10B981' : '#9CA3AF';
+                          },
+                        },
+                        {
+                          label: 'Tipo',
+                          render: (v: AdVariation) => ({ copy: 'Copy only', visual: 'Visual only', both: 'Copy + Visual', cta: 'CTA only' }[v.changeType]),
+                          color: () => '#9CA3AF',
+                        },
+                      ].map(row => (
+                        <tr key={row.label}>
+                          <td className="py-2.5 pr-4 text-zinc-600 font-medium">{row.label}</td>
+                          {compareVariations.map(v => (
+                            <td key={v.id} className="py-2.5 pr-4 font-semibold capitalize"
+                              style={{ color: row.color(v) }}>
+                              {row.render(v)}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex items-center gap-1.5 mt-3 pt-3" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                  <Info size={9} className="text-zinc-700 shrink-0" />
+                  <p className="text-[9px] text-zinc-700">
+                    Proyección estimada · Basado en datos disponibles · Los resultados reales pueden variar
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Variations grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
               {results.map((v, i) => (
                 <VariationCard
                   key={v.id}
                   variation={{ ...v, status: getStatus(v.id) }}
-                  onApprove={approve}
-                  onReject={reject}
+                  onUse={handleUse}
+                  onSaveDraft={handleSaveDraft}
+                  onMarkABTest={handleMarkABTest}
+                  onCompare={handleCompare}
+                  isComparing={compareIds.has(v.id)}
                   delay={i * 80}
                 />
               ))}
             </div>
 
-            {approvedIds.size > 0 && (
-              <div className="flex items-center gap-3 p-4 rounded-2xl fade-in-up"
+            {/* Action summary banner */}
+            {(usedIds.size > 0 || abTestIds.size > 0) && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 p-4 rounded-2xl fade-in-up"
                 style={{ background: 'rgba(52,211,153,0.06)', border: '1px solid rgba(52,211,153,0.15)' }}>
-                <Check size={18} className="text-emerald-400" />
-                <div>
-                  <p className="text-sm font-semibold text-white">
-                    {approvedIds.size} variation{approvedIds.size > 1 ? 's' : ''} approved
-                  </p>
-                  <p className="text-xs text-zinc-500">Ready to export to your ad platform or launch A/B test</p>
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                    style={{ background: 'rgba(16,185,129,0.15)' }}>
+                    <TrendingUp size={15} className="text-emerald-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-white">
+                      {usedIds.size > 0 && `${usedIds.size} variation${usedIds.size > 1 ? 's' : ''} ready to use`}
+                      {usedIds.size > 0 && abTestIds.size > 0 && ' · '}
+                      {abTestIds.size > 0 && `${abTestIds.size} in A/B testing`}
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      Proyección estimada basada en datos disponibles · No garantizado
+                    </p>
+                  </div>
                 </div>
-                <button className="ml-auto flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white"
+                <button
+                  onClick={() => {
+                    const selected = results.filter(v => usedIds.has(v.id) || abTestIds.has(v.id));
+                    const data = selected.map(v => ({
+                      id: v.id, headline: v.headline, description: v.description,
+                      cta: v.cta, angle: v.angle, platform: v.recommendedPlatform,
+                      predictedCTR: v.predictedCTR, predictedCPC: v.predictedCPC,
+                      predictedROAS: v.predictedROAS, confidence: v.confidence,
+                      status: usedIds.has(v.id) ? 'approved' : 'testing',
+                      changeType: v.changeType, rationale: v.rationale,
+                    }));
+                    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+                    const url  = URL.createObjectURL(blob);
+                    const a    = document.createElement('a');
+                    a.href     = url;
+                    a.download = `adgenius-variations-${Date.now()}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-95"
                   style={{ background: 'linear-gradient(135deg,#059669,#10B981)' }}>
-                  Export <ChevronRight size={14} />
+                  Export Selected <ChevronRight size={14} />
                 </button>
               </div>
             )}
@@ -719,10 +920,19 @@ export default function GeneratorPage() {
 
         {/* ── Variation Library ── */}
         <div className="space-y-4">
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Zap size={14} className="text-amber-400" />
-            Variation Library
-          </h2>
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <Zap size={14} className="text-amber-400" />
+              Variation Library
+            </h2>
+            <div className="flex items-center gap-2">
+              <Badge variant="zinc">{mockVariations.length} saved</Badge>
+              <span className="text-xs text-zinc-600">
+                {mockVariations.filter(v => v.status === 'testing').length} in A/B ·{' '}
+                {mockVariations.filter(v => v.status === 'approved').length} approved
+              </span>
+            </div>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {mockVariations.map((v, i) => (
               <VariationCard key={v.id} variation={v} delay={i * 60} />
