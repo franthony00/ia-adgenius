@@ -26,6 +26,7 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
   const [variations, setVariations] = useState<AdVariation[]>(mockVariations.filter(v => v.originalAdId === id));
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'metrics' | 'analysis' | 'variations'>('metrics');
+  const [ctaToast, setCtaToast]   = useState(false);
 
   useEffect(() => {
     fetch(`/api/ads/${id}`)
@@ -125,10 +126,12 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
               <div className="p-4" style={{ background: '#111827' }}>
                 <p className="text-sm font-bold text-white mb-1">{ad.headline}</p>
                 <p className="text-xs text-zinc-400 leading-relaxed mb-3">{ad.description}</p>
-                <div className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white"
+                <button
+                  onClick={() => { setCtaToast(true); setTimeout(() => setCtaToast(false), 2800); }}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all active:scale-95"
                   style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}>
                   {ad.cta} <ExternalLink size={10} />
-                </div>
+                </button>
               </div>
             </div>
 
@@ -162,7 +165,7 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
           {/* ── Right: Tabs ── */}
           <div className="lg:col-span-2 space-y-5">
             {/* Tabs */}
-            <div className="flex gap-1 p-1 rounded-xl w-fit" style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="flex gap-1 p-1 rounded-xl overflow-x-auto max-w-full" style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
               {(['metrics', 'analysis', 'variations'] as const).map(tab => (
                 <button key={tab} onClick={() => setActiveTab(tab)}
                   className={cn('px-4 py-2 rounded-lg text-sm font-medium transition-all capitalize',
@@ -329,6 +332,15 @@ export default function AdDetailPage({ params }: { params: Promise<{ id: string 
           </div>
         </div>
       </div>
+
+      {/* CTA demo toast */}
+      {ctaToast && (
+        <div className="fixed bottom-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-50 flex items-center gap-3 px-4 py-3 rounded-2xl fade-in-up"
+          style={{ background: '#111827', border: '1px solid rgba(16,185,129,0.3)', boxShadow: '0 12px 32px rgba(0,0,0,0.6)' }}>
+          <Sparkles size={14} className="text-emerald-400 shrink-0" />
+          <p className="text-xs font-semibold text-white">Demo mode — CTA not connected yet</p>
+        </div>
+      )}
     </AppLayout>
   );
 }

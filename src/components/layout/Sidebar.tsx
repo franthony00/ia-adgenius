@@ -100,16 +100,16 @@ function BillingPane({ onAction }: { onAction: () => void }) {
               <span>Renewal: Jun 2026</span>
             </div>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
             <button
               onClick={onAction}
-              className="px-3 py-1.5 rounded-lg text-[10px] font-semibold text-zinc-400 hover:text-white transition-colors"
+              className="px-3 py-1.5 rounded-lg text-[10px] font-semibold text-zinc-400 hover:text-white transition-colors text-center"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
               Manage Billing
             </button>
             <button
               onClick={onAction}
-              className="px-3 py-1.5 rounded-lg text-[10px] font-semibold text-white transition-all hover:opacity-90"
+              className="px-3 py-1.5 rounded-lg text-[10px] font-semibold text-white transition-all hover:opacity-90 text-center"
               style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}>
               Change Plan
             </button>
@@ -213,14 +213,14 @@ function BillingDemoToast({ onClose }: { onClose: () => void }) {
   }, []);
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[60] flex items-center gap-3 px-5 py-3.5 rounded-2xl fade-in-up"
-      style={{ background: '#111827', border: '1px solid rgba(245,158,11,0.3)', boxShadow: '0 12px 32px rgba(0,0,0,0.6)', whiteSpace: 'nowrap' }}>
+    <div className="fixed bottom-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[60] flex items-center gap-3 px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl fade-in-up"
+      style={{ background: '#111827', border: '1px solid rgba(245,158,11,0.3)', boxShadow: '0 12px 32px rgba(0,0,0,0.6)' }}>
       <div className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0"
         style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.2)' }}>
         <CreditCard size={14} className="text-amber-400" />
       </div>
       <p className="text-xs font-semibold text-white">Billing actions are in demo mode</p>
-      <button onClick={onClose} className="ml-1 text-zinc-600 hover:text-zinc-400 transition-colors">
+      <button onClick={onClose} className="ml-1 text-zinc-600 hover:text-zinc-400 transition-colors shrink-0">
         <X size={13} />
       </button>
     </div>
@@ -245,21 +245,22 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
       />
 
       {/* Modal — wider when billing to fit plan cards */}
-      <div className="fixed inset-0 flex items-center justify-center p-4 z-50 pointer-events-none">
+      <div className="fixed inset-0 flex items-center justify-center p-3 sm:p-4 z-50 pointer-events-none">
         <div
-          className="w-full pointer-events-auto fade-in-up"
+          className="w-full pointer-events-auto fade-in-up flex flex-col"
           style={{
-            maxWidth:    isBilling ? '800px' : '512px',
-            background:  '#111827',
-            border:      '1px solid rgba(255,255,255,0.1)',
-            boxShadow:   '0 24px 64px rgba(0,0,0,0.6)',
+            maxWidth:     isBilling ? '800px' : '512px',
+            maxHeight:    '90vh',
+            background:   '#111827',
+            border:       '1px solid rgba(255,255,255,0.1)',
+            boxShadow:    '0 24px 64px rgba(0,0,0,0.6)',
             borderRadius: '16px',
-            overflow:    'hidden',
-            transition:  'max-width 0.2s ease',
+            overflow:     'hidden',
+            transition:   'max-width 0.2s ease',
           }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-6 py-5"
+          <div className="flex items-center justify-between px-4 sm:px-6 py-4 sm:py-5 shrink-0"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
             <div>
               <h2 className="text-base font-bold text-white">Settings</h2>
@@ -271,18 +272,20 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
             </button>
           </div>
 
-          {/* Body: nav + detail */}
-          <div className="flex" style={{ minHeight: '340px' }}>
+          {/* Body: horizontal tabs on mobile, nav+detail on sm+ */}
+          <div className="flex flex-col sm:flex-row flex-1 min-h-0">
 
-            {/* Section nav */}
-            <div className="w-44 shrink-0 p-3 space-y-0.5"
-              style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+            {/* Section nav — scrollable horizontal on mobile, sidebar on sm+ */}
+            <div
+              className="flex flex-row sm:flex-col overflow-x-auto sm:overflow-x-visible shrink-0 sm:w-44 p-2 sm:p-3 gap-1 border-b sm:border-b-0 sm:border-r"
+              style={{ borderColor: 'rgba(255,255,255,0.06)' }}
+            >
               {SETTINGS_SECTIONS.map(({ id, Icon, label }) => (
                 <button
                   key={id}
                   onClick={() => setActiveSection(id)}
                   className={cn(
-                    'w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-medium text-left transition-all',
+                    'flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium text-left transition-all whitespace-nowrap sm:w-full',
                     activeSection === id
                       ? 'text-white'
                       : 'text-zinc-500 hover:text-zinc-300 hover:bg-white/5',
@@ -299,18 +302,18 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
             </div>
 
             {/* Detail pane — scrollable */}
-            <div className="flex-1 overflow-y-auto" style={{ maxHeight: '70vh' }}>
-              <div className="p-6">
+            <div className="flex-1 overflow-y-auto">
+              <div className="p-4 sm:p-6">
 
-                {/* Section header — shared across all sections */}
+                {/* Section header */}
                 <div className="flex items-center gap-3 mb-5">
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
                     style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
                     <section.Icon size={16} className="text-emerald-400" />
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <p className="text-sm font-bold text-white">{section.label}</p>
-                    <p className="text-[10px] text-zinc-500 mt-0.5">{section.desc}</p>
+                    <p className="text-[10px] text-zinc-500 mt-0.5 break-words">{section.desc}</p>
                   </div>
                 </div>
 
@@ -318,7 +321,6 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
                 {isBilling ? (
                   <BillingPane onAction={() => setShowBillingToast(true)} />
                 ) : (
-                  /* Generic sections */
                   <div className="rounded-xl p-4 space-y-2"
                     style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                     <p className="text-xs text-zinc-400 leading-relaxed">
@@ -335,7 +337,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-4 flex justify-end"
+          <div className="px-4 sm:px-6 py-3 sm:py-4 flex justify-end shrink-0"
             style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
             <button onClick={onClose}
               className="flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold text-white transition-all hover:opacity-90"
