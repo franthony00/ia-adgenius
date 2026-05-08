@@ -1,3 +1,4 @@
+export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAuthContext } from '@/lib/auth';
@@ -7,7 +8,6 @@ import {
   mockPlatformMix, mockPerformanceLoop, mockRecommendations,
 } from '@/lib/mock-data';
 import type { DashboardStats, PlatformMixItem, Platform } from '@/lib/types';
-
 const MOCK_RESPONSE = {
   stats:           mockDashboardStats,
   topAds:          mockAds.filter(a => a.status === 'active').slice(0, 5),
@@ -18,19 +18,15 @@ const MOCK_RESPONSE = {
   source:          'mock' as const,
   fetchedAt:       new Date().toISOString(),
 };
-
 export async function GET() {
   const authCtx = await getAuthContext();
-
   // Demo mode or new user with no data → return mock
   if (authCtx.isDemo) {
     return NextResponse.json({ ...MOCK_RESPONSE, fetchedAt: new Date().toISOString() });
   }
-
   try {
     const { workspaceId } = authCtx;
     const wsFilter = { campaign: { workspaceId } };
-
     const [dbAds, dbHistory, analysesCount, variationsCount, testingCount, winningCount, snapshotAgg] =
       await Promise.all([
         prisma.ad.findMany({
@@ -54,24 +50,20 @@ export async function GET() {
           _sum:  { spend: true, revenue: true, impressions: true, conversions: true },
         }),
       ]);
-
     // New workspace with no ads yet → show mock as sample data
     if (dbAds.length === 0) {
       return NextResponse.json({ ...MOCK_RESPONSE, fetchedAt: new Date().toISOString() });
     }
-
     const activeAds    = dbAds.filter(a => a.status === 'active');
     // Use MetricSnapshot aggregates as the source of truth for spend/revenue
     const totalSpend   = snapshotAgg._sum.spend       ?? 0;
     const totalRevenue = snapshotAgg._sum.revenue     ?? 0;
     const totalImps    = snapshotAgg._sum.impressions ?? 0;
     const totalConvs   = snapshotAgg._sum.conversions ?? 0;
-
     const avgROAS = activeAds.length > 0
       ? activeAds.reduce((s, a) => s + a.roas, 0) / activeAds.length : 0;
     const avgCTR = activeAds.length > 0
       ? activeAds.reduce((s, a) => s + a.ctr, 0) / activeAds.length : 0;
-
     const stats: DashboardStats = {
       totalSpend,
       totalRevenue,
@@ -92,7 +84,6 @@ export async function GET() {
       estimatedAvgROAS:    mockDashboardStats.estimatedAvgROAS,
       realAvgROAS:         +avgROAS.toFixed(2),
     };
-
     const byPlatform: Record<string, { spend: number; roas: number[]; ctr: number[] }> = {};
     for (const a of dbAds) {
       const p = a.platform;
@@ -101,7 +92,6 @@ export async function GET() {
       if (a.roas > 0) byPlatform[p].roas.push(a.roas);
       if (a.ctr  > 0) byPlatform[p].ctr.push(a.ctr);
     }
-
     const platformMix: PlatformMixItem[] = Object.entries(byPlatform).map(([p, d]) => ({
       platform: p as Platform,
       spend:    +d.spend.toFixed(0),
@@ -109,7 +99,6 @@ export async function GET() {
       roas:     d.roas.length > 0 ? +(d.roas.reduce((s, v) => s + v, 0) / d.roas.length).toFixed(1) : 0,
       ctr:      d.ctr.length  > 0 ? +(d.ctr.reduce((s, v)  => s + v, 0) / d.ctr.length).toFixed(2)  : 0,
     }));
-
     return NextResponse.json({
       stats,
       topAds:          activeAds.slice(0, 5).map(mapAd),

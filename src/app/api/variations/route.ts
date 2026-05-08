@@ -1,9 +1,9 @@
+export const runtime = 'nodejs';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { getAuthContext } from '@/lib/auth';
 import { mapVariation } from '@/lib/services/mappers';
 import { mockVariations } from '@/lib/mock-data';
-
 // UI string → Prisma enum value
 function unmapAngle(a: string | undefined): string | null {
   if (!a) return null;
@@ -20,7 +20,6 @@ function unmapAngle(a: string | undefined): string | null {
   };
   return MAP[a] ?? null;
 }
-
 function unmapModel(m: string): string {
   const MAP: Record<string, string> = {
     'claude-3-5-sonnet': 'claude_3_5_sonnet',
@@ -30,18 +29,14 @@ function unmapModel(m: string): string {
   };
   return MAP[m] ?? 'claude_3_5_sonnet';
 }
-
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const adId = searchParams.get('adId');
-
   const authCtx = await getAuthContext();
-
   if (authCtx.isDemo) {
     const fallback = adId ? mockVariations.filter(v => v.originalAdId === adId) : mockVariations;
     return NextResponse.json({ variations: fallback, source: 'mock' });
   }
-
   try {
     const dbVariations = await prisma.adVariation.findMany({
       where: {
@@ -51,12 +46,10 @@ export async function GET(req: Request) {
       include: { originalAd: true },
       orderBy: { createdAt: 'desc' },
     });
-
     if (dbVariations.length === 0) {
       const fallback = adId ? mockVariations.filter(v => v.originalAdId === adId) : mockVariations;
       return NextResponse.json({ variations: fallback, source: 'mock' });
     }
-
     return NextResponse.json({ variations: dbVariations.map(mapVariation), source: 'db' });
   } catch (err) {
     console.error('[GET /api/variations]', err);
@@ -64,18 +57,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ variations: fallback, source: 'mock' });
   }
 }
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function POST(req: Request) {
   const authCtx = await getAuthContext();
-
   if (authCtx.isDemo) {
     return NextResponse.json({ error: 'Not available in demo mode' }, { status: 403 });
   }
-
   try {
     const { originalAdId, variations } = await req.json();
-
     // Verify the source ad belongs to this workspace
     const dbAd = await prisma.ad.findFirst({
       where: { id: originalAdId, campaign: { workspaceId: authCtx.workspaceId } },
@@ -83,7 +72,6 @@ export async function POST(req: Request) {
     if (!dbAd) {
       return NextResponse.json({ error: 'Ad not found' }, { status: 404 });
     }
-
     const created = await prisma.$transaction(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (variations as any[]).map(v =>
@@ -110,7 +98,6 @@ export async function POST(req: Request) {
         }),
       ),
     );
-
     await prisma.historyEntry.create({
       data: {
         type:        'variation',
@@ -120,7 +107,6 @@ export async function POST(req: Request) {
         relatedAdId: originalAdId,
       },
     });
-
     return NextResponse.json({ variations: created.map(mapVariation), source: 'db' });
   } catch (err) {
     console.error('[POST /api/variations]', err);
