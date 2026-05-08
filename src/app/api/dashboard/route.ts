@@ -31,7 +31,7 @@ export async function GET() {
     const { workspaceId } = authCtx;
     const wsFilter = { campaign: { workspaceId } };
 
-    const [dbAds, dbHistory, analysesCount, variationsCount, testingCount, winningCount] =
+    const [dbAds, dbHistory, analysesCount, variationsCount, testingCount, winningCount, snapshotAgg] =
       await Promise.all([
         prisma.ad.findMany({
           where:   wsFilter,
@@ -48,6 +48,11 @@ export async function GET() {
         prisma.adVariation.count({ where: { originalAd: wsFilter } }),
         prisma.adVariation.count({ where: { originalAd: wsFilter, status: 'testing' } }),
         prisma.adVariation.count({ where: { originalAd: wsFilter, status: 'approved' } }),
+        // Aggregate real spend/revenue from MetricSnapshot (not from budget)
+        prisma.metricSnapshot.aggregate({
+          where: { ad: wsFilter },
+          _sum:  { spend: true, revenue: true, impressions: true, conversions: true },
+        }),
       ]);
 
     // New workspace with no ads yet → show mock as sample data
@@ -56,10 +61,11 @@ export async function GET() {
     }
 
     const activeAds    = dbAds.filter(a => a.status === 'active');
-    const totalSpend   = dbAds.reduce((s, a) => s + a.spend,       0);
-    const totalRevenue = dbAds.reduce((s, a) => s + a.revenue,     0);
-    const totalImps    = dbAds.reduce((s, a) => s + a.impressions, 0);
-    const totalConvs   = dbAds.reduce((s, a) => s + a.conversions, 0);
+    // Use MetricSnapshot aggregates as the source of truth for spend/revenue
+    const totalSpend   = snapshotAgg._sum.spend       ?? 0;
+    const totalRevenue = snapshotAgg._sum.revenue     ?? 0;
+    const totalImps    = snapshotAgg._sum.impressions ?? 0;
+    const totalConvs   = snapshotAgg._sum.conversions ?? 0;
 
     const avgROAS = activeAds.length > 0
       ? activeAds.reduce((s, a) => s + a.roas, 0) / activeAds.length : 0;

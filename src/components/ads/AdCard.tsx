@@ -14,7 +14,8 @@ const PLATFORM_ICONS: Record<string, string> = {
 };
 
 export default function AdCard({ ad, delay = 0 }: AdCardProps) {
-  const hasMetrics = ad.metrics.impressions > 0;
+  const hasMetrics = ad.metrics.impressions > 0 || ad.metrics.ctr > 0
+    || ad.metrics.roas > 0 || ad.metrics.spend > 0;
 
   return (
     <Link href={`/ads/${ad.id}`}>

@@ -196,7 +196,6 @@ export default function AddAdModal({ onClose, onAdd }: AddAdModalProps) {
           imageUrl:    form.imageUrl.trim() || null,
           budget:      parseFloat(form.budget) || 0,
           metrics: {
-            spend:       parseFloat(form.budget)    || 0,
             ctr:         parseFloat(form.ctr)       || 0,
             cpc:         parseFloat(form.cpc)       || 0,
             cpa:         parseFloat(form.cpa)       || 0,

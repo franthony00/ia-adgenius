@@ -58,6 +58,22 @@ export async function POST(req: Request) {
       });
     }
 
+    // Derive computed fields from raw metrics (budget ≠ spend)
+    const impr  = metrics?.impressions ?? 0;
+    const ctr   = metrics?.ctr         ?? 0;
+    const cpc   = metrics?.cpc         ?? 0;
+    const roas  = metrics?.roas        ?? 0;
+    const conv  = metrics?.conversions ?? 0;
+    const cpa   = metrics?.cpa         ?? null;
+
+    const clicks  = Math.round(impr * (ctr / 100));
+    const spend   = +((cpc * clicks) || 0).toFixed(2);
+    const revenue = +((spend * (roas || 1))).toFixed(2);
+    const cpm     = impr > 0 ? +((spend / impr) * 1000).toFixed(2) : null;
+    const reach   = impr > 0 ? Math.round(impr * 0.85) : null;
+
+    const hasMetrics = impr > 0 || ctr > 0 || cpc > 0 || roas > 0 || conv > 0;
+
     const dbAd = await prisma.ad.create({
       data: {
         name,
@@ -68,16 +84,41 @@ export async function POST(req: Request) {
         platform:    platform as never,
         status:      status   as never,
         campaignId:  campaign.id,
-        spend:       metrics?.spend       ?? 0,
-        impressions: metrics?.impressions ?? 0,
-        conversions: metrics?.conversions ?? 0,
-        ctr:         metrics?.ctr         ?? 0,
-        cpc:         metrics?.cpc         ?? 0,
-        cpa:         metrics?.cpa         ?? null,
-        roas:        metrics?.roas        ?? 0,
+        spend,
+        revenue,
+        impressions: impr,
+        clicks,
+        conversions: conv,
+        ctr,
+        cpc,
+        cpm,
+        cpa,
+        roas,
+        reach,
       },
       include: { campaign: true },
     });
+
+    // Create initial MetricSnapshot if the user filled any metric
+    if (hasMetrics) {
+      await prisma.metricSnapshot.create({
+        data: {
+          adId:        dbAd.id,
+          spend,
+          revenue,
+          impressions: impr,
+          clicks,
+          conversions: conv,
+          ctr,
+          cpc,
+          cpm,
+          cpa,
+          roas,
+          reach,
+          frequency:   1.4,
+        },
+      });
+    }
 
     await prisma.historyEntry.create({
       data: {
