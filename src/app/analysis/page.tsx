@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import SafeAdImage from '@/components/ui/SafeAdImage';
 import {
   Sparkles, TrendingUp, TrendingDown, Lightbulb, Brain,
@@ -13,8 +13,9 @@ import ProgressBar from '@/components/ui/ProgressBar';
 import InsightCard from '@/components/ai/InsightCard';
 import Badge from '@/components/ui/Badge';
 import { mockAds, mockAnalyses, globalPatterns } from '@/lib/mock-data';
+import type { AIAnalysis } from '@/lib/types';
 import { formatPercent, formatMultiplier, formatDate, cn, sleep } from '@/lib/utils';
-import type { AIModel } from '@/lib/types';
+import type { AIModel, Ad } from '@/lib/types';
 
 // ── Module-level constants (stable across renders) ─────────────────────────
 
@@ -59,12 +60,28 @@ const ANALYSIS_STEPS = [
 type Step = 'idle' | 'loading' | 'done';
 
 export default function AnalysisPage() {
-  const [selectedAd, setSelectedAd] = useState(mockAds[0]);
+  const [ads, setAds]               = useState<Ad[]>(mockAds);
+  const [analyses, setAnalyses]     = useState(mockAnalyses);
+  const [selectedAd, setSelectedAd] = useState<Ad>(mockAds[0]);
   const [model, setModel]           = useState<AIModel>('claude-3-5-sonnet');
   const [step, setStep]             = useState<Step>('idle');
   const [progress, setProgress]     = useState(0);
   const [activeAnalysis, setActiveAnalysis] = useState(mockAnalyses[0]);
   const [loadingText, setLoadingText]       = useState('');
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/ads').then(r => r.json()),
+      fetch('/api/analyses').then(r => r.json()),
+    ]).then(([adsData, analysesData]) => {
+      const loadedAds      = adsData.ads      ?? mockAds;
+      const loadedAnalyses = analysesData.analyses ?? mockAnalyses;
+      setAds(loadedAds);
+      setAnalyses(loadedAnalyses);
+      if (loadedAds.length > 0)      setSelectedAd(loadedAds[0]);
+      if (loadedAnalyses.length > 0) setActiveAnalysis(loadedAnalyses[0]);
+    }).catch(() => { /* keep mock defaults */ });
+  }, []);
 
   // Tracks the current run so stale async results are discarded
   const runIdRef = useRef(0);
@@ -85,7 +102,7 @@ export default function AnalysisPage() {
         // Bail out if the user changed the ad or triggered a new run while we waited
         if (runId !== runIdRef.current) return;
       }
-      const found = mockAnalyses.find(a => a.adId === adId) ?? mockAnalyses[0];
+      const found = analyses.find((a: AIAnalysis) => a.adId === adId) ?? analyses[0] ?? mockAnalyses[0];
       setActiveAnalysis(found);
       setStep('done');
     } catch {
@@ -118,7 +135,7 @@ export default function AnalysisPage() {
             style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
             <h2 className="text-sm font-semibold text-white">Select Ad to Analyse</h2>
             <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-              {mockAds.filter(a => a.status !== 'draft').map(ad => (
+              {ads.filter((a: Ad) => a.status !== 'draft').map(ad => (
                 <button
                   key={ad.id}
                   onClick={() => {

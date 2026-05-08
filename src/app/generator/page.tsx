@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import SafeAdImage from '@/components/ui/SafeAdImage';
 import {
   Sparkles, Wand2, RefreshCw, Check, ChevronRight,
@@ -465,7 +465,19 @@ function generateVariationsForAd(
 // ─────────────────────────────────────────────────────────────────────────────
 
 export default function GeneratorPage() {
-  const [selectedAd, setSelectedAd]   = useState(mockAds[0]);
+  const [ads, setAds]                 = useState<Ad[]>(mockAds);
+  const [selectedAd, setSelectedAd]   = useState<Ad>(mockAds[0]);
+
+  useEffect(() => {
+    fetch('/api/ads')
+      .then(r => r.json())
+      .then(data => {
+        const loaded = data.ads ?? mockAds;
+        setAds(loaded);
+        if (loaded.length > 0) setSelectedAd(loaded[0]);
+      })
+      .catch(() => { /* keep mock defaults */ });
+  }, []);
   const [mode, setMode]               = useState<GenerateMode>('both');
   const [model, setModel]             = useState<AIModel>('claude-3-5-sonnet');
   const [count, setCount]             = useState(2);
@@ -493,7 +505,7 @@ export default function GeneratorPage() {
     setShowCompare(false);
   };
 
-  const selectAd = (ad: typeof mockAds[0]) => {
+  const selectAd = (ad: Ad) => {
     runIdRef.current++;
     setSelectedAd(ad);
     setStep('config');
@@ -584,7 +596,7 @@ export default function GeneratorPage() {
               style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)' }}>
               <h2 className="text-sm font-semibold text-white">Source Ad</h2>
               <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
-                {mockAds.map(ad => (
+                {ads.map(ad => (
                   <button key={ad.id} onClick={() => selectAd(ad)}
                     className={cn('w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all border',
                       selectedAd.id === ad.id ? 'border-emerald-500/30' : 'border-transparent hover:bg-white/5')}

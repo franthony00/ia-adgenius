@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useState } from 'react';
+import { use, useState, useEffect } from 'react';
 import SafeAdImage from '@/components/ui/SafeAdImage';
 import Link from 'next/link';
 import {
@@ -13,6 +13,7 @@ import Badge from '@/components/ui/Badge';
 import ProgressBar from '@/components/ui/ProgressBar';
 import InsightCard from '@/components/ai/InsightCard';
 import { mockAds, mockAnalyses, mockVariations } from '@/lib/mock-data';
+import type { Ad, AIAnalysis, AdVariation } from '@/lib/types';
 import {
   formatCurrency, formatNumber, formatPercent, formatMultiplier,
   getStatusColor, getPlatformLabel, getPlatformColor, formatDate, cn,
@@ -20,10 +21,33 @@ import {
 
 export default function AdDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
-  const ad = mockAds.find(a => a.id === id);
-  const analysis = mockAnalyses.find(a => a.adId === id);
-  const variations = mockVariations.filter(v => v.originalAdId === id);
+  const [ad, setAd]               = useState<Ad | null>(mockAds.find(a => a.id === id) ?? null);
+  const [analysis, setAnalysis]   = useState<AIAnalysis | null>(mockAnalyses.find(a => a.adId === id) ?? null);
+  const [variations, setVariations] = useState<AdVariation[]>(mockVariations.filter(v => v.originalAdId === id));
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'metrics' | 'analysis' | 'variations'>('metrics');
+
+  useEffect(() => {
+    fetch(`/api/ads/${id}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.ad)         setAd(data.ad);
+        if (data.analysis)   setAnalysis(data.analysis);
+        if (data.variations) setVariations(data.variations);
+      })
+      .catch(() => { /* keep mock defaults */ })
+      .finally(() => setIsLoading(false));
+  }, [id]);
+
+  if (isLoading && !ad) {
+    return (
+      <AppLayout>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   if (!ad) {
     return (

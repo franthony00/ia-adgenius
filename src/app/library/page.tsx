@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Filter, LayoutGrid, List, Plus } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import Header from '@/components/layout/Header';
@@ -17,12 +17,24 @@ const PLATFORMS: (Platform | 'all')[] = ['all', 'facebook', 'instagram', 'tiktok
 const STATUSES:  (AdStatus  | 'all')[] = ['all', 'active', 'paused', 'draft', 'completed'];
 
 export default function LibraryPage() {
-  const [ads, setAds]               = useState<Ad[]>(mockAds);
+  const [ads, setAds]               = useState<Ad[]>([]);
+  const [isLoading, setIsLoading]   = useState(true);
   const [showModal, setShowModal]   = useState(false);
   const [view, setView]             = useState<ViewMode>('grid');
   const [platform, setPlatform]     = useState<Platform | 'all'>('all');
   const [status, setStatus]         = useState<AdStatus | 'all'>('all');
   const [sort, setSort]             = useState<'roas' | 'ctr' | 'spend' | 'score' | 'date'>('roas');
+
+  const loadAds = useCallback(() => {
+    setIsLoading(true);
+    fetch('/api/ads')
+      .then(r => r.json())
+      .then(data => setAds(data.ads ?? mockAds))
+      .catch(() => setAds(mockAds))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => { loadAds(); }, [loadAds]);
 
   const filtered = useMemo(() => {
     let list = [...ads];
@@ -57,7 +69,7 @@ export default function LibraryPage() {
             <span className="hidden sm:inline">Add Ad</span>
           </button>
         }
-        onRefresh={() => setAds(mockAds)}
+        onRefresh={loadAds}
       />
 
       <div className="flex-1 p-4 sm:p-6 lg:p-8 space-y-5 lg:space-y-6">
@@ -130,7 +142,11 @@ export default function LibraryPage() {
         </div>
 
         {/* Grid / List */}
-        {filtered.length > 0 ? (
+        {isLoading ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
+          </div>
+        ) : filtered.length > 0 ? (
           <div className={cn('grid gap-5',
             view === 'grid'
               ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'

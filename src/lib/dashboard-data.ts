@@ -1,12 +1,8 @@
 /**
  * Dashboard Data Layer
  *
- * Single seam between the dashboard UI and data sources.
- * Currently returns mock data. To switch to real data:
- *   1. Set CONNECTED_PLATFORMS with real account IDs after OAuth.
- *   2. Replace the body of `fetchDashboardData` with a real API call:
- *      const res = await fetch(`/api/dashboard?platform=${platform}&accountId=${accountId}`);
- *      return res.json();
+ * Fetches dashboard data from /api/dashboard (backed by Neon/Prisma).
+ * Falls back to mock data automatically if the DB is unavailable or empty.
  */
 
 import type {
@@ -20,7 +16,6 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-/** All data the dashboard needs, in one object. */
 export interface DashboardData {
   stats: DashboardStats;
   topAds: Ad[];
@@ -28,12 +23,11 @@ export interface DashboardData {
   platformMix: PlatformMixItem[];
   performanceLoop: PerformanceLoopEntry[];
   recommendations: AIRecommendation[];
-  /** 'demo' = mock data  |  'live' = real connected account data */
+  /** 'demo' = mock data  |  'live' = real DB data */
   source: 'demo' | 'live';
   fetchedAt: string;
 }
 
-/** A connected ad account (populated after OAuth). */
 export interface ConnectedAccount {
   id: string;
   platform: string;
@@ -41,57 +35,42 @@ export interface ConnectedAccount {
   accountId: string;
 }
 
-// ─── Connected accounts registry ─────────────────────────────────────────────
-/**
- * Replace this with persisted state (localStorage, Supabase, etc.) when
- * implementing real OAuth. Empty array = demo mode.
- */
-export const CONNECTED_ACCOUNTS: ConnectedAccount[] = [
-  // Example of what a real entry looks like — leave commented out:
-  // { id: 'meta-1', platform: 'meta', name: 'My Business Page', accountId: 'act_123456789' },
-];
+// Empty until Meta/Google OAuth is connected
+export const CONNECTED_ACCOUNTS: ConnectedAccount[] = [];
 
 // ─── Data fetch ───────────────────────────────────────────────────────────────
 
-/**
- * Fetch dashboard data for the given platform/account.
- * - No args → returns demo data.
- * - With args → will call real API (not implemented yet).
- *
- * To implement real data: replace this function's body with an API call.
- */
 export async function fetchDashboardData(
   _platform?: string | null,
   _adAccountId?: string | null,
 ): Promise<DashboardData> {
-  const isLive = Boolean(_platform && _adAccountId);
+  try {
+    const res = await fetch('/api/dashboard', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`Dashboard API error: ${res.status}`);
+    const json = await res.json();
 
-  if (isLive) {
-    // ── REAL DATA (future) ────────────────────────────────────────────────
-    // Example:
-    // const res = await fetch(
-    //   `/api/dashboard?platform=${_platform}&accountId=${_adAccountId}`,
-    //   { credentials: 'include' }
-    // );
-    // if (!res.ok) throw new Error(`Dashboard API error: ${res.status}`);
-    // const json = await res.json();
-    // return { ...json, source: 'live', fetchedAt: new Date().toISOString() };
-    //
-    // For now, fall through to mock data (will be replaced above):
+    return {
+      stats:           json.stats           ?? mockDashboardStats,
+      topAds:          json.topAds          ?? mockAds.filter(a => a.status === 'active').slice(0, 5),
+      recentHistory:   json.recentHistory   ?? mockHistory.slice(0, 6),
+      platformMix:     json.platformMix     ?? mockPlatformMix,
+      performanceLoop: json.performanceLoop ?? mockPerformanceLoop,
+      recommendations: json.recommendations ?? mockRecommendations,
+      source:          json.source === 'db' ? 'live' : 'demo',
+      fetchedAt:       json.fetchedAt       ?? new Date().toISOString(),
+    };
+  } catch {
+    // Network error or server error — fall back to mock
+    await new Promise(r => setTimeout(r, 200));
+    return {
+      stats:           mockDashboardStats,
+      topAds:          mockAds.filter(a => a.status === 'active').slice(0, 5),
+      recentHistory:   mockHistory.slice(0, 6),
+      platformMix:     mockPlatformMix,
+      performanceLoop: mockPerformanceLoop,
+      recommendations: mockRecommendations,
+      source:          'demo',
+      fetchedAt:       new Date().toISOString(),
+    };
   }
-
-  // ── DEMO / MOCK DATA (current) ───────────────────────────────────────────
-  // Simulate a short async delay so the loading state is exercised
-  await new Promise(r => setTimeout(r, 200));
-
-  return {
-    stats:           mockDashboardStats,
-    topAds:          mockAds.filter(a => a.status === 'active').slice(0, 5),
-    recentHistory:   mockHistory.slice(0, 6),
-    platformMix:     mockPlatformMix,
-    performanceLoop: mockPerformanceLoop,
-    recommendations: mockRecommendations,
-    source:          'demo',
-    fetchedAt:       new Date().toISOString(),
-  };
 }

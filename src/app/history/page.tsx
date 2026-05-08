@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   BarChart3, Sparkles, Activity, Plus, ArrowRight, Clock,
@@ -10,6 +10,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import Header from '@/components/layout/Header';
 import Badge from '@/components/ui/Badge';
 import { mockHistory, mockAnalyses, mockVariations } from '@/lib/mock-data';
+import type { AIAnalysis } from '@/lib/types';
 import { formatRelativeTime, formatDate, cn } from '@/lib/utils';
 import type { HistoryEntry } from '@/lib/types';
 
@@ -23,9 +24,37 @@ const TYPE_META: Record<string, { icon: React.ReactNode; label: string; color: s
 };
 
 export default function HistoryPage() {
-  const [filter, setFilter] = useState<FilterType>('all');
+  const [filter, setFilter]       = useState<FilterType>('all');
+  const [history, setHistory]     = useState<HistoryEntry[]>(mockHistory);
+  const [analyses, setAnalyses]   = useState(mockAnalyses);
+  const [counts, setCounts]       = useState({
+    analyses:  mockAnalyses.length,
+    variations: mockVariations.length,
+    approved:  mockVariations.filter(v => v.status === 'approved').length,
+    testing:   mockVariations.filter(v => v.status === 'testing').length,
+  });
 
-  const filtered = mockHistory.filter(h => filter === 'all' || h.type === filter);
+  useEffect(() => {
+    fetch('/api/history')
+      .then(r => r.json())
+      .then(data => {
+        setHistory(data.entries     ?? mockHistory);
+        setCounts({
+          analyses:   data.analysesCount   ?? mockAnalyses.length,
+          variations: data.variationsCount ?? mockVariations.length,
+          approved:   data.approvedCount   ?? mockVariations.filter(v => v.status === 'approved').length,
+          testing:    data.testingCount    ?? mockVariations.filter(v => v.status === 'testing').length,
+        });
+      })
+      .catch(() => { /* keep mock defaults */ });
+
+    fetch('/api/analyses')
+      .then(r => r.json())
+      .then(data => setAnalyses(data.analyses ?? mockAnalyses))
+      .catch(() => { /* keep mock defaults */ });
+  }, []);
+
+  const filtered = history.filter(h => filter === 'all' || h.type === filter);
 
   const grouped: Record<string, HistoryEntry[]> = {};
   filtered.forEach(h => {
@@ -35,10 +64,10 @@ export default function HistoryPage() {
   });
 
   const SUMMARY = [
-    { label: 'Total Analyses',        value: mockAnalyses.length,                                  icon: <BarChart3 size={16} />,  color: '#10B981', border: 'rgba(16,185,129,0.2)',  link: '/analysis'  },
-    { label: 'Variations Generated',  value: mockVariations.length,                                icon: <Sparkles size={16} />,   color: '#22D3EE', border: 'rgba(34,211,238,0.2)',  link: '/generator' },
-    { label: 'Approved Variations',   value: mockVariations.filter(v => v.status === 'approved').length, icon: <TrendingUp size={16} />, color: '#34D399', border: 'rgba(52,211,153,0.2)',  link: '/generator' },
-    { label: 'Active Tests',          value: mockVariations.filter(v => v.status === 'testing').length,  icon: <Lightbulb size={16} />,  color: '#FBBF24', border: 'rgba(251,191,36,0.2)', link: '/generator' },
+    { label: 'Total Analyses',        value: counts.analyses,   icon: <BarChart3 size={16} />,  color: '#10B981', border: 'rgba(16,185,129,0.2)',  link: '/analysis'  },
+    { label: 'Variations Generated',  value: counts.variations, icon: <Sparkles size={16} />,   color: '#22D3EE', border: 'rgba(34,211,238,0.2)',  link: '/generator' },
+    { label: 'Approved Variations',   value: counts.approved,   icon: <TrendingUp size={16} />, color: '#34D399', border: 'rgba(52,211,153,0.2)',  link: '/generator' },
+    { label: 'Active Tests',          value: counts.testing,    icon: <Lightbulb size={16} />,  color: '#FBBF24', border: 'rgba(251,191,36,0.2)', link: '/generator' },
   ];
 
   return (
@@ -166,7 +195,7 @@ export default function HistoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {mockAnalyses.map(a => (
+                {analyses.map((a: AIAnalysis) => (
                   <tr key={a.id} className="border-b border-white/[0.03]">
                     <td className="py-3 pr-4">
                       <p className="text-white font-medium truncate max-w-32">{a.adName}</p>

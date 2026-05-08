@@ -1,0 +1,378 @@
+// Prisma schema — AdGenius
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum Platform {
+  facebook
+  instagram
+  tiktok
+  google
+  linkedin
+}
+
+enum AccountPlatform {
+  meta
+  google
+  tiktok
+  linkedin
+}
+
+enum AdStatus {
+  active
+  paused
+  draft
+  completed
+}
+
+enum AdFormat {
+  image
+  video
+  carousel
+  reel
+}
+
+enum CampaignObjective {
+  brand_awareness
+  conversions
+  traffic
+  lead_generation
+  reach
+}
+
+enum CampaignStatus {
+  active
+  paused
+  completed
+  draft
+}
+
+enum VariationStatus {
+  pending
+  testing
+  approved
+  draft
+  rejected
+}
+
+enum ChangeType {
+  copy
+  visual
+  both
+  cta
+}
+
+enum SalesAngle {
+  emocional
+  directa
+  urgencia
+  oferta
+  autoridad
+  problema_solucion
+  curiosidad
+  social_proof
+  ugc
+}
+
+enum AIModel {
+  claude_3_5_sonnet
+  claude_opus_4
+  gpt_4o
+  gemini_1_5_pro
+}
+
+enum PlanId {
+  starter
+  pro
+  performance
+  agency
+  enterprise
+}
+
+enum SubscriptionStatus {
+  active
+  trialing
+  past_due
+  cancelled
+}
+
+enum WorkspaceRole {
+  owner
+  admin
+  member
+}
+
+enum HistoryType {
+  analysis
+  variation
+  ad_added
+  metric_update
+  status_change
+}
+
+enum ConnectionStatus {
+  connected
+  disconnected
+  expired
+  error
+}
+
+enum SyncStatus {
+  success
+  error
+  partial
+}
+
+enum Sentiment {
+  positive
+  neutral
+  negative
+}
+
+enum PerformanceLevel {
+  high
+  medium
+  low
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  name       String
+  avatarUrl  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  memberships WorkspaceMember[]
+}
+
+model Workspace {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members           WorkspaceMember[]
+  campaigns         Campaign[]
+  connectedAccounts ConnectedAccount[]
+  subscription      Subscription?
+  history           HistoryEntry[]
+}
+
+model WorkspaceMember {
+  id          String        @id @default(cuid())
+  role        WorkspaceRole @default(member)
+  joinedAt    DateTime      @default(now())
+
+  userId      String
+  workspaceId String
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
+}
+
+model Subscription {
+  id                 String             @id @default(cuid())
+  planId             PlanId             @default(pro)
+  status             SubscriptionStatus @default(active)
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  cancelAtPeriodEnd  Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  workspaceId String    @unique
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model ConnectedAccount {
+  id                 String          @id @default(cuid())
+  platform           AccountPlatform
+  name               String
+  externalAccountId  String?
+  status             ConnectionStatus @default(disconnected)
+  connectedAt        DateTime?
+  lastSyncAt         DateTime?
+  tokenExpiresAt     DateTime?
+  adsImported        Int             @default(0)
+  campaignsImported  Int             @default(0)
+  currency           String?
+  timezone           String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  syncHistory SyncHistory[]
+}
+
+model Campaign {
+  id         String            @id @default(cuid())
+  name       String
+  objective  CampaignObjective @default(brand_awareness)
+  status     CampaignStatus    @default(active)
+  platform   Platform          @default(facebook)
+  dailyBudget Float?
+  totalBudget Float?
+  startDate  DateTime?
+  endDate    DateTime?
+  externalId String?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  ads Ad[]
+}
+
+model Ad {
+  id          String   @id @default(cuid())
+  name        String
+  headline    String
+  description String
+  cta         String
+  imageUrl    String?
+  format      AdFormat @default(image)
+  platform    Platform @default(facebook)
+  status      AdStatus @default(active)
+  aiScore     Int?
+
+  // Performance metrics (latest snapshot)
+  spend       Float    @default(0)
+  revenue     Float    @default(0)
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  conversions Int      @default(0)
+  ctr         Float    @default(0)
+  cpc         Float    @default(0)
+  cpm         Float?
+  cpa         Float?
+  roas        Float    @default(0)
+  reach       Int?
+  frequency   Float?
+
+  externalId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+
+  metrics    MetricSnapshot[]
+  analyses   AIAnalysis[]
+  variations AdVariation[]
+  history    HistoryEntry[]
+}
+
+model MetricSnapshot {
+  id          String   @id @default(cuid())
+  date        DateTime @default(now())
+  spend       Float    @default(0)
+  revenue     Float    @default(0)
+  impressions Int      @default(0)
+  clicks      Int      @default(0)
+  conversions Int      @default(0)
+  ctr         Float    @default(0)
+  cpc         Float    @default(0)
+  cpm         Float?
+  cpa         Float?
+  roas        Float    @default(0)
+  reach       Int?
+  frequency   Float?
+
+  adId String
+  ad   Ad     @relation(fields: [adId], references: [id], onDelete: Cascade)
+
+  @@index([adId, date])
+}
+
+model AIAnalysis {
+  id                  String           @id @default(cuid())
+  model               AIModel          @default(claude_3_5_sonnet)
+  overallScore        Int
+  copyScore           Int
+  visualScore         Int
+  audienceScore       Int
+  hookStrength        Int
+  estimatedCTR        Float
+  estimatedROAS       Float
+  strengths           String[]
+  weaknesses          String[]
+  recommendations     String[]
+  patterns            Json             @default("[]")
+  sentiment           Sentiment        @default(positive)
+  predictedPerformance PerformanceLevel @default(medium)
+  createdAt           DateTime         @default(now())
+
+  adId String
+  ad   Ad     @relation(fields: [adId], references: [id], onDelete: Cascade)
+}
+
+model AdVariation {
+  id                  String          @id @default(cuid())
+  headline            String
+  description         String
+  cta                 String
+  imageUrl            String?
+  imagePrompt         String?
+  predictedCTR        Float
+  predictedCPC        Float?
+  predictedROAS       Float
+  confidence          Int?
+  angle               SalesAngle?
+  recommendedPlatform Platform?
+  status              VariationStatus @default(pending)
+  model               AIModel         @default(claude_3_5_sonnet)
+  rationale           String
+  changeType          ChangeType      @default(copy)
+  createdAt           DateTime        @default(now())
+
+  originalAdId String
+  originalAd   Ad     @relation(fields: [originalAdId], references: [id], onDelete: Cascade)
+}
+
+model HistoryEntry {
+  id          String      @id @default(cuid())
+  type        HistoryType
+  title       String
+  description String
+  model       AIModel?
+  score       Int?
+  createdAt   DateTime    @default(now())
+
+  relatedAdId String?
+  relatedAd   Ad?         @relation(fields: [relatedAdId], references: [id], onDelete: SetNull)
+
+  workspaceId String
+  workspace   Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model SyncHistory {
+  id                String     @id @default(cuid())
+  status            SyncStatus
+  adsImported       Int        @default(0)
+  campaignsImported Int        @default(0)
+  startedAt         DateTime
+  finishedAt        DateTime?
+  note              String?
+
+  connectedAccountId String
+  connectedAccount   ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
+}

@@ -12,6 +12,9 @@ import {
 import { cn } from '@/lib/utils';
 import { mockAds, mockAnalyses, pricingPlans } from '@/lib/mock-data';
 import type { PricingPlan } from '@/lib/types';
+import ClerkUserCard from '@/components/auth/ClerkUserCard';
+
+const HAS_CLERK = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 // ─── Nav ──────────────────────────────────────────────────────────────────────
 const NAV = [
@@ -558,18 +561,22 @@ function SidebarContent({ onClose, onOpenSettings, onOpenNotifications, unreadCo
             )}
           </button>
         </div>
-        <div className="flex items-center gap-2 p-2 rounded-xl"
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0"
-            style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}>
-            M
+        {HAS_CLERK ? (
+          <ClerkUserCard />
+        ) : (
+          <div className="flex items-center gap-2 p-2 rounded-xl"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white shrink-0"
+              style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}>
+              D
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-zinc-200 truncate">Demo User</p>
+              <p className="text-[10px] text-zinc-600">Pro Plan · Demo</p>
+            </div>
+            <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-medium text-zinc-200 truncate">Marketing Team</p>
-            <p className="text-[10px] text-zinc-600">Pro Plan</p>
-          </div>
-          <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-        </div>
+        )}
       </div>
     </div>
   );
