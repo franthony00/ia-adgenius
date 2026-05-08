@@ -478,6 +478,13 @@ export default function GeneratorPage() {
       })
       .catch(() => { /* keep mock defaults */ });
   }, []);
+
+  useEffect(() => {
+    fetch('/api/variations')
+      .then(r => r.json())
+      .then(data => { if (data.variations) setSavedVariations(data.variations); })
+      .catch(() => { /* keep mock defaults */ });
+  }, []);
   const [mode, setMode]               = useState<GenerateMode>('both');
   const [model, setModel]             = useState<AIModel>('claude-3-5-sonnet');
   const [count, setCount]             = useState(2);
@@ -492,6 +499,9 @@ export default function GeneratorPage() {
   const [abTestIds, setAbTestIds]     = useState<Set<string>>(new Set());
   const [compareIds, setCompareIds]   = useState<Set<string>>(new Set());
   const [showCompare, setShowCompare] = useState(false);
+  // localId → DB id (populated after bulk save succeeds)
+  const [dbIdMap, setDbIdMap]         = useState<Record<string, string>>({});
+  const [savedVariations, setSavedVariations] = useState<AdVariation[]>(mockVariations);
 
   const runIdRef = useRef(0);
 
@@ -520,17 +530,30 @@ export default function GeneratorPage() {
   };
 
   // ── Actions ───────────────────────────────────────────────────────────────────
+  const patchVariation = (localId: string, status: string) => {
+    const dbId = dbIdMap[localId];
+    if (!dbId) return;
+    fetch(`/api/variations/${dbId}`, {
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ status }),
+    }).catch(() => { /* optimistic — ignore errors */ });
+  };
+
   const handleUse = (id: string) => {
     setUsedIds(s => new Set([...s, id]));
     setDraftIds(s => { const n = new Set(s); n.delete(id); return n; });
     setAbTestIds(s => { const n = new Set(s); n.delete(id); return n; });
+    patchVariation(id, 'approved');
   };
 
   const handleSaveDraft = (id: string) => {
     if (usedIds.has(id)) return;
     setDraftIds(s => {
-      const n = new Set(s);
-      if (n.has(id)) n.delete(id); else n.add(id);
+      const n   = new Set(s);
+      const add = !n.has(id);
+      if (add) n.add(id); else n.delete(id);
+      patchVariation(id, add ? 'draft' : 'pending');
       return n;
     });
   };
@@ -539,6 +562,7 @@ export default function GeneratorPage() {
     if (usedIds.has(id)) return;
     setAbTestIds(s => new Set([...s, id]));
     setDraftIds(s => { const n = new Set(s); n.delete(id); return n; });
+    patchVariation(id, 'testing');
   };
 
   const handleCompare = (id: string) => {
@@ -551,10 +575,11 @@ export default function GeneratorPage() {
 
   // ── Generate ──────────────────────────────────────────────────────────────────
   const generate = async () => {
-    const runId       = ++runIdRef.current;
-    const adSnapshot  = selectedAd;
+    const runId      = ++runIdRef.current;
+    const adSnapshot = selectedAd;
 
     resetResults();
+    setDbIdMap({});
     setStep('generating');
     setProgress(0);
 
@@ -569,6 +594,29 @@ export default function GeneratorPage() {
       if (runId !== runIdRef.current) return;
       setResults(variations);
       setStep('results');
+
+      // Persist to DB in background (best-effort)
+      fetch('/api/variations', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ originalAdId: adSnapshot.id, variations }),
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data?.variations || runId !== runIdRef.current) return;
+          // Build localId → dbId map (order preserved by $transaction)
+          const map: Record<string, string> = {};
+          (data.variations as AdVariation[]).forEach((dbV, i) => {
+            map[variations[i].id] = dbV.id;
+          });
+          setDbIdMap(map);
+          // Refresh the library at the bottom
+          return fetch('/api/variations').then(r => r.json());
+        })
+        .then(data => {
+          if (data?.variations) setSavedVariations(data.variations);
+        })
+        .catch(() => { /* silent — local state is still correct */ });
     } catch {
       if (runId === runIdRef.current) setStep('config');
     }
@@ -938,15 +986,15 @@ export default function GeneratorPage() {
               Variation Library
             </h2>
             <div className="flex items-center gap-2">
-              <Badge variant="zinc">{mockVariations.length} saved</Badge>
+              <Badge variant="zinc">{savedVariations.length} saved</Badge>
               <span className="text-xs text-zinc-600">
-                {mockVariations.filter(v => v.status === 'testing').length} in A/B ·{' '}
-                {mockVariations.filter(v => v.status === 'approved').length} approved
+                {savedVariations.filter(v => v.status === 'testing').length} in A/B ·{' '}
+                {savedVariations.filter(v => v.status === 'approved').length} approved
               </span>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {mockVariations.map((v, i) => (
+            {savedVariations.map((v, i) => (
               <VariationCard key={v.id} variation={v} delay={i * 60} />
             ))}
           </div>

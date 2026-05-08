@@ -94,7 +94,7 @@ export default function AdCard({ ad, delay = 0 }: AdCardProps) {
             </div>
           ) : (
             <div className="pt-3 border-t border-white/5 flex items-center gap-2">
-              <Badge variant="zinc">Draft — no metrics yet</Badge>
+              <Badge variant="zinc">{ad.status.charAt(0).toUpperCase() + ad.status.slice(1)} — no metrics yet</Badge>
             </div>
           )}
         </div>
