@@ -15,6 +15,8 @@ export interface PlanState {
 // Safe defaults while loading (pro = good UX, same as demo mode)
 const DEFAULT_PLAN: PlanId = 'pro';
 
+const VALID_PLAN_IDS: readonly PlanId[] = ['starter', 'pro', 'performance', 'agency', 'enterprise'];
+
 function buildDefault(): PlanState {
   return {
     planId:         DEFAULT_PLAN,
@@ -31,10 +33,13 @@ export function usePlan(): PlanState {
     fetch('/api/plan')
       .then(r => r.json())
       .then(data => {
+        // Guard against malformed API responses (e.g. error JSON without planId)
+        // to prevent downstream crashes in components that index into plan maps.
+        const planId: PlanId = VALID_PLAN_IDS.includes(data.planId) ? data.planId : DEFAULT_PLAN;
         setState({
-          planId:         data.planId,
-          variationLimit: data.variationLimit,
-          features:       data.features,
+          planId,
+          variationLimit: data.variationLimit ?? getVariationLimit(planId),
+          features:       data.features       ?? getFeatureMap(planId),
           loading:        false,
         });
       })
