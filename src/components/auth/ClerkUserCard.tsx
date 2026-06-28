@@ -2,14 +2,24 @@
 
 import { useUser, UserButton, useClerk } from '@clerk/nextjs';
 import { LogOut } from 'lucide-react';
+import { usePlan } from '@/hooks/usePlan';
+
+const PLAN_LABEL: Record<string, string> = {
+  starter:     'Starter Plan',
+  pro:         'Pro Plan',
+  performance: 'Performance Plan',
+  agency:      'Agency Plan',
+  enterprise:  'Enterprise Plan',
+};
 
 /**
  * Rendered in the Sidebar only when Clerk is configured.
- * Shows the current user's name, a Clerk UserButton, and a sign-out button.
+ * Shows the current user's name, active plan, and a sign-out button.
  */
 export default function ClerkUserCard() {
   const { user, isLoaded } = useUser();
   const { signOut } = useClerk();
+  const { planId, loading: planLoading } = usePlan();
 
   // Loading skeleton
   if (!isLoaded) {
@@ -27,9 +37,8 @@ export default function ClerkUserCard() {
     );
   }
 
-  const name = user?.fullName
-    ?? user?.emailAddresses[0]?.emailAddress
-    ?? 'User';
+  const name      = user?.fullName ?? user?.emailAddresses[0]?.emailAddress ?? 'User';
+  const planLabel = planLoading ? '…' : (PLAN_LABEL[planId] ?? `${planId} Plan`);
 
   return (
     <div
@@ -40,17 +49,17 @@ export default function ClerkUserCard() {
         appearance={{
           variables: { colorPrimary: '#10B981', borderRadius: '8px' },
           elements: {
-            userButtonAvatarBox:           'w-7 h-7 rounded-lg',
-            userButtonPopoverCard:         'bg-[#111827] border border-white/10 shadow-2xl',
-            userButtonPopoverActionButton: 'text-zinc-300 hover:text-white hover:bg-white/5',
+            userButtonAvatarBox:               'w-7 h-7 rounded-lg',
+            userButtonPopoverCard:             'bg-[#111827] border border-white/10 shadow-2xl',
+            userButtonPopoverActionButton:     'text-zinc-300 hover:text-white hover:bg-white/5',
             userButtonPopoverActionButtonText: 'text-xs',
-            userButtonPopoverFooter:       'hidden',
+            userButtonPopoverFooter:           'hidden',
           },
         }}
       />
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium text-zinc-200 truncate">{name}</p>
-        <p className="text-[10px] text-zinc-600">Pro Plan</p>
+        <p className="text-[10px] text-zinc-600">{planLabel}</p>
       </div>
       <div className="flex items-center gap-1.5">
         <div className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
