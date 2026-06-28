@@ -1,11 +1,13 @@
 'use client';
 
+import React from 'react';
 import SafeAdImage from '@/components/ui/SafeAdImage';
 import Link from 'next/link';
 import {
   DollarSign, TrendingUp, MousePointer, Lightbulb, BarChart3,
   Sparkles, ArrowRight, Star, Activity, Play, Award, Target, ChevronRight,
   Zap, RefreshCw, Copy, AlertTriangle, Pause, GitBranch, Info,
+  ThumbsUp, ThumbsDown, Trophy, XCircle,
 } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import Header from '@/components/layout/Header';
@@ -72,6 +74,50 @@ const CONFIDENCE_COLOR: Record<string, string> = {
 };
 
 // ─── Component ────────────────────────────────────────────────────────────────
+
+// ─── Feedback buttons for recommendations ────────────────────────────────────
+type RecFeedback = 'useful' | 'not_useful' | 'winner' | 'failed';
+
+function RecFeedbackBar({ recId }: { recId: string }) {
+  const [sent, setSent] = React.useState<RecFeedback | null>(null);
+
+  async function sendFeedback(type: RecFeedback) {
+    setSent(type);
+    try {
+      await fetch('/api/recommendations/feedback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recommendationId: recId, feedbackType: type }),
+      });
+    } catch { /* silent */ }
+  }
+
+  if (sent) {
+    return (
+      <p className="text-[10px] text-emerald-400 font-medium mt-2">
+        ✓ Feedback registrado
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5 mt-2.5">
+      <span className="text-[10px] text-zinc-600 mr-0.5">¿Útil?</span>
+      {([
+        { type: 'useful'    as RecFeedback, icon: <ThumbsUp  size={11} />, label: 'Sí',      color: '#34D399' },
+        { type: 'not_useful'as RecFeedback, icon: <ThumbsDown size={11} />, label: 'No',      color: '#F87171' },
+        { type: 'winner'    as RecFeedback, icon: <Trophy    size={11} />, label: 'Ganadora', color: '#FBBF24' },
+        { type: 'failed'    as RecFeedback, icon: <XCircle   size={11} />, label: 'Fallida',  color: '#6B7280' },
+      ] as const).map(({ type, icon, label, color }) => (
+        <button key={type} onClick={() => sendFeedback(type)}
+          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-all hover:opacity-80"
+          style={{ background: `${color}12`, color, border: `1px solid ${color}25` }}>
+          {icon} {label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export default function DashboardPage() {
   const {
@@ -585,6 +631,10 @@ export default function DashboardPage() {
                       </Link>
                     )}
                   </div>
+
+                  {/* Feedback loop */}
+                  <RecFeedbackBar recId={rec.id} />
+
                 </div>
               );
             })}

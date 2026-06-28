@@ -35,7 +35,10 @@ export function useDashboardData(): UseDashboardDataResult {
 
   const connectedAccounts = CONNECTED_ACCOUNTS;
   const hasConnectedAccounts = connectedAccounts.length > 0;
-  const isDemoMode = !hasConnectedAccounts || !selectedAdAccount;
+  // isDemoMode is driven by what the API actually returned, not by the
+  // (currently empty) CONNECTED_ACCOUNTS list. The API sets source='db'
+  // when it finds real workspace data, and 'mock' when it falls back.
+  const isDemoMode = !data || data.source === 'demo';
 
   const refresh = useCallback(() => setRefreshKey(k => k + 1), []);
 

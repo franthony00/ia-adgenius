@@ -132,6 +132,60 @@ enum SyncStatus {
   partial
 }
 
+enum CreativeFormat {
+  instagram_post
+  instagram_story
+  facebook_ad
+  banner
+  flyer
+  whatsapp_status
+}
+
+enum CreativeStyle {
+  premium
+  minimalista
+  tecnologico
+  urbano
+  elegante
+  comercial
+  deportivo
+}
+
+enum CreativeObjective {
+  awareness
+  conversions
+  traffic
+  leads
+  retention
+}
+
+enum CreativeVariationStatus {
+  draft
+  generating
+  ready
+  approved
+  rejected
+}
+
+enum FeedbackType {
+  useful
+  not_useful
+  used
+  saved
+  winner
+  failed
+}
+
+enum InsightCategory {
+  copy
+  visual
+  audience
+  platform
+  cta
+  angle
+  timing
+}
+
 enum Sentiment {
   positive
   neutral
@@ -165,11 +219,16 @@ model Workspace {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  members           WorkspaceMember[]
-  campaigns         Campaign[]
-  connectedAccounts ConnectedAccount[]
-  subscription      Subscription?
-  history           HistoryEntry[]
+  members              WorkspaceMember[]
+  campaigns            Campaign[]
+  connectedAccounts    ConnectedAccount[]
+  subscription         Subscription?
+  history              HistoryEntry[]
+  brandKit             BrandKit?
+  creativeVariations   CreativeVariation[]
+  learningInsights     LearningInsight[]
+  performancePatterns  PerformancePattern[]
+  recommendationFeedback RecommendationFeedback[]
 }
 
 model WorkspaceMember {
@@ -375,4 +434,114 @@ model SyncHistory {
 
   connectedAccountId String
   connectedAccount   ConnectedAccount @relation(fields: [connectedAccountId], references: [id], onDelete: Cascade)
+}
+
+// ─── Brand Kit ────────────────────────────────────────────────────────────────
+
+model BrandKit {
+  id             String   @id @default(cuid())
+  businessName   String?
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
+  businessType   String?
+  services       String[] @default([])
+  phone          String?
+  whatsapp       String?
+  address        String?
+  instagram      String?
+  facebook       String?
+  tone           String?
+  targetAudience String?
+  visualStyle    String?
+  frequentOffers String[] @default([])
+  preferredCTAs  String[] @default([])
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  workspaceId String    @unique
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ─── Creative Studio ──────────────────────────────────────────────────────────
+
+model CreativeVariation {
+  id          String                  @id @default(cuid())
+  title       String
+  description String?
+  format      CreativeFormat          @default(instagram_post)
+  style       CreativeStyle           @default(premium)
+  objective   CreativeObjective       @default(awareness)
+  headline    String?
+  copy        String?
+  cta         String?
+  phone       String?
+  imagePrompt String?
+  imageUrl    String?
+  status      CreativeVariationStatus @default(draft)
+  notes       String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+// ─── Learning System ──────────────────────────────────────────────────────────
+
+model LearningInsight {
+  id          String          @id @default(cuid())
+  category    InsightCategory
+  title       String
+  description String
+  value       String          // The winning value (e.g. "Urgencia", "#FF0000", "Comprar ahora")
+  confidence  Int             @default(50) // 0-100
+  sampleSize  Int             @default(1)
+  avgCTR      Float?
+  avgROAS     Float?
+  avgCPC      Float?
+  platform    Platform?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, category])
+}
+
+model PerformancePattern {
+  id             String    @id @default(cuid())
+  patternType    String    // e.g. "winning_cta", "top_angle", "best_platform"
+  patternValue   String    // e.g. "Comprar ahora", "Urgencia", "instagram"
+  occurrences    Int       @default(1)
+  avgCTR         Float?
+  avgROAS        Float?
+  avgCPC         Float?
+  avgCPA         Float?
+  avgConversions Float?
+  lastSeen       DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, patternType, patternValue])
+  @@index([workspaceId, patternType])
+}
+
+// ─── Recommendation Feedback ──────────────────────────────────────────────────
+
+model RecommendationFeedback {
+  id               String       @id @default(cuid())
+  recommendationId String       // External ID (from mock or real recommendations)
+  feedbackType     FeedbackType
+  notes            String?
+  createdAt        DateTime     @default(now())
+
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, recommendationId])
 }

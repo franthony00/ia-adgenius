@@ -1,6 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  allowedDevOrigins: ['10.0.0.113', '192.168.2.102'],
+  allowedDevOrigins: ['10.0.0.113', '192.168.2.101', '192.168.2.102'],
   images: {
     // All mock data now uses local /public/ads/*.svg — no external images needed.
     // These entries cover: user-entered URLs, ad platform CDNs, and common image hosts.

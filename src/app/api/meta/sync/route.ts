@@ -6,10 +6,21 @@ import {
   createSyncLog, finishSyncLog,
 } from '@/lib/supabase/meta-repository';
 
+import { getAuthContext } from '@/lib/auth';
+import { hasFeature } from '@/lib/plan-gates';
+
 export const runtime    = 'nodejs';
 export const maxDuration = 300; // 5 min timeout for large accounts
 
 export async function POST(request: NextRequest) {
+  const authCtx = await getAuthContext();
+  if (!hasFeature(authCtx.planId, 'meta_connect')) {
+    return NextResponse.json(
+      { error: 'Meta Ads sync requires Performance plan or higher.', requiredPlan: 'performance' },
+      { status: 403 },
+    );
+  }
+
   const accountId = process.env.META_AD_ACCOUNT_ID;
   if (!accountId) {
     return NextResponse.json({ error: 'META_AD_ACCOUNT_ID not configured' }, { status: 500 });

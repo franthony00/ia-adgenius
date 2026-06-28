@@ -1,24 +1,34 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { prisma } from './db';
+import type { PlanId } from './types';
 
 export const DEMO_USER_ID      = 'demo-user';
 export const DEMO_WORKSPACE_ID = 'demo-workspace';
+
+/** Emails that bypass all plan gates and get enterprise-level access. */
+export const ADMIN_EMAILS = ['franthonysanchez77@gmail.com'];
 
 export interface AuthContext {
   userId: string;
   workspaceId: string;
   isDemo: boolean;
+  /** Active subscription plan. Demo mode and new workspaces default to 'pro'. */
+  planId: PlanId;
+  /** True for admin emails — bypasses all plan gates. */
+  isAdmin: boolean;
 }
 
 /**
- * Returns the current user's DB ids.
+ * Returns the current user's DB ids and active plan.
  *
- * - If Clerk is not configured → demo mode (no sign-in required).
+ * - If Clerk is not configured → demo mode (no sign-in required), planId 'pro'.
  * - If user is signed in       → upserts User + Workspace on first visit.
  * - If Clerk fails unexpectedly → falls back to demo mode.
  */
 export async function getAuthContext(): Promise<AuthContext> {
-  const demo: AuthContext = { userId: DEMO_USER_ID, workspaceId: DEMO_WORKSPACE_ID, isDemo: true };
+  const demo: AuthContext = {
+    userId: DEMO_USER_ID, workspaceId: DEMO_WORKSPACE_ID, isDemo: true, planId: 'pro', isAdmin: false,
+  };
 
   // No Clerk keys → demo mode
   if (!process.env.CLERK_SECRET_KEY) return demo;
@@ -46,8 +56,16 @@ export async function getAuthContext(): Promise<AuthContext> {
       select: { workspaceId: true },
     });
 
+    const isAdmin = ADMIN_EMAILS.includes(email);
+
     if (membership) {
-      return { userId: clerkId, workspaceId: membership.workspaceId, isDemo: false };
+      const wsId = membership.workspaceId;
+      const sub  = await prisma.subscription.findUnique({
+        where:  { workspaceId: wsId },
+        select: { planId: true },
+      });
+      const planId: PlanId = isAdmin ? 'enterprise' : (sub?.planId ?? 'pro') as PlanId;
+      return { userId: clerkId, workspaceId: wsId, isDemo: false, planId, isAdmin };
     }
 
     // First login: create a default workspace automatically
@@ -60,7 +78,7 @@ export async function getAuthContext(): Promise<AuthContext> {
       },
     });
 
-    return { userId: clerkId, workspaceId: workspace.id, isDemo: false };
+    return { userId: clerkId, workspaceId: workspace.id, isDemo: false, planId: isAdmin ? 'enterprise' : 'pro', isAdmin };
   } catch (err) {
     console.error('[getAuthContext]', err);
     return demo;

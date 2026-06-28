@@ -5,7 +5,7 @@ import {
   RefreshCw, CheckCircle, XCircle, AlertTriangle, ArrowRight,
   BarChart3, Zap, Clock, TrendingUp, TrendingDown,
   ExternalLink, Download, ChevronRight, Info,
-  Globe, Layers, X,
+  Globe, Layers, X, Link2,
 } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
 import Header from '@/components/layout/Header';
@@ -17,6 +17,21 @@ import {
 } from '@/lib/mock-data';
 import { formatCurrency, formatPercent, formatMultiplier, sleep } from '@/lib/utils';
 import type { ImportedCampaign } from '@/lib/types';
+import { usePlan } from '@/hooks/usePlan';
+
+interface MetaStatus {
+  connected: boolean;
+  ad_account_id?: string;
+  meta_user_id?: string;
+  expires_at?: string;
+  days_remaining?: number;
+  connected_since?: string;
+}
+
+interface SyncResult {
+  adsImported: number;
+  campaignsImported: number;
+}
 
 // ─── Platform brand config ────────────────────────────────────────────────────
 const META_COLOR   = '#1877F2';
@@ -295,12 +310,55 @@ function GoogleComingSoonToast({ onClose }: { onClose: () => void }) {
   );
 }
 
+// ─── Upgrade wall ─────────────────────────────────────────────────────────────
+function UpgradeWall() {
+  return (
+    <div className="rounded-2xl p-8 text-center space-y-4 fade-in-up"
+      style={{ background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.18)' }}>
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto"
+        style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)' }}>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FBBF24" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+        </svg>
+      </div>
+      <div>
+        <p className="text-sm font-bold text-white mb-1">Performance Plan Required</p>
+        <p className="text-xs text-zinc-400 leading-relaxed max-w-xs mx-auto">
+          Meta Ads and Google Ads connections are available on the <span className="text-amber-400 font-semibold">Performance plan</span> ($149/mo) and higher.
+        </p>
+      </div>
+      <div className="flex flex-col sm:flex-row gap-2 justify-center pt-1">
+        <a href="#billing"
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95"
+          style={{ background: 'linear-gradient(135deg,#F59E0B,#D97706)', boxShadow: '0 4px 12px rgba(245,158,11,0.25)' }}>
+          Upgrade to Performance
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+        </a>
+        <button
+          onClick={() => document.dispatchEvent(new CustomEvent('open-settings', { detail: 'billing' }))}
+          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition-colors"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          View Plans
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function AdPlatformsPage() {
-  const [metaSyncing, setMetaSyncing]     = useState(false);
-  const [metaSyncDone, setMetaSyncDone]   = useState(false);
-  const [showCampaigns, setShowCampaigns] = useState(false);
+  const { features, loading: planLoading } = usePlan();
+  const canConnectMeta = !planLoading && features.meta_connect;
+
+  const [metaSyncing, setMetaSyncing]         = useState(false);
+  const [metaSyncDone, setMetaSyncDone]       = useState(false);
+  const [metaSyncResult, setMetaSyncResult]   = useState<SyncResult | null>(null);
+  const [metaSyncError, setMetaSyncError]     = useState<string | null>(null);
+  const [showCampaigns, setShowCampaigns]     = useState(false);
   const [showGoogleToast, setShowGoogleToast] = useState(false);
+  const [metaStatus, setMetaStatus]           = useState<MetaStatus | null>(null);
+  const [statusLoading, setStatusLoading]     = useState(true);
 
   const metaAccount   = mockPlatformAccounts.find(a => a.platform === 'meta')!;
   const googleAccount = mockPlatformAccounts.find(a => a.platform === 'google')!;
@@ -315,13 +373,41 @@ export default function AdPlatformsPage() {
     ? activeCampaigns.reduce((s, c) => s + c.roas, 0) / activeCampaigns.length
     : 0;
 
+  // Fetch real Meta connection status on mount
+  useEffect(() => {
+    fetch('/api/meta/status')
+      .then(r => r.json())
+      .then((data: MetaStatus) => setMetaStatus(data))
+      .catch(() => setMetaStatus({ connected: false }))
+      .finally(() => setStatusLoading(false));
+  }, []);
+
   const handleMetaSync = async () => {
     setMetaSyncing(true);
     setMetaSyncDone(false);
-    await sleep(1500);
-    setMetaSyncing(false);
-    setMetaSyncDone(true);
+    setMetaSyncError(null);
+    setMetaSyncResult(null);
+    try {
+      const res = await fetch('/api/meta/sync', { method: 'POST' });
+      const data = await res.json() as { adsImported?: number; campaignsImported?: number; error?: string };
+      if (!res.ok) {
+        setMetaSyncError(data.error ?? 'Sync failed');
+      } else {
+        setMetaSyncResult({
+          adsImported: data.adsImported ?? 0,
+          campaignsImported: data.campaignsImported ?? 0,
+        });
+        setMetaSyncDone(true);
+      }
+    } catch {
+      setMetaSyncError('Network error — could not reach sync endpoint');
+    } finally {
+      setMetaSyncing(false);
+    }
   };
+
+  // Whether Meta is really connected (not just mock)
+  const isReallyConnected = !statusLoading && metaStatus?.connected === true;
 
   const formatSyncDate = (iso: string) =>
     new Date(iso).toLocaleString('en-US', {
@@ -334,11 +420,19 @@ export default function AdPlatformsPage() {
         title="Ad Platforms"
         subtitle="Connect and sync your advertising accounts"
         action={
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
-            style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
-            <span className="text-[10px] font-semibold text-amber-400">Demo Mode</span>
-          </div>
+          isReallyConnected ? (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+              style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)' }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-[10px] font-semibold text-emerald-400">Meta Connected</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+              style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}>
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+              <span className="text-[10px] font-semibold text-amber-400">Demo Mode</span>
+            </div>
+          )
         }
       />
 
@@ -359,26 +453,62 @@ export default function AdPlatformsPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-bold text-white">Meta Ads</p>
-                    <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }}>
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Connected
-                    </span>
+                    {statusLoading ? (
+                      <span className="text-[10px] text-zinc-600 animate-pulse">Checking…</span>
+                    ) : isReallyConnected ? (
+                      <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Connected
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full text-zinc-500"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <span className="w-1.5 h-1.5 rounded-full bg-zinc-600" />
+                        Not Connected
+                      </span>
+                    )}
                   </div>
                   <p className="text-[10px] text-zinc-600 mt-0.5">Facebook · Instagram · Audience Network</p>
                 </div>
               </div>
-              <Badge variant="zinc">Demo</Badge>
+              <Badge variant={isReallyConnected ? 'emerald' : 'zinc'}>{isReallyConnected ? 'Live' : 'Demo'}</Badge>
             </div>
 
-            {/* Account info */}
+            {/* Plan gate — upgrade wall */}
+            {!planLoading && !canConnectMeta && (
+              <div className="mb-5"><UpgradeWall /></div>
+            )}
+
+            {/* Not connected — prompt to connect (only if plan allows) */}
+            {!statusLoading && !isReallyConnected && canConnectMeta && (
+              <div className="mb-5 p-4 rounded-xl"
+                style={{ background: 'rgba(24,119,242,0.06)', border: '1px solid rgba(24,119,242,0.2)' }}>
+                <p className="text-xs text-zinc-300 mb-3 leading-relaxed">
+                  Connect your Meta Ads account to import real campaigns and sync live performance data.
+                </p>
+                <a
+                  href="/api/meta/oauth/login"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95"
+                  style={{ background: `linear-gradient(135deg,${META_COLOR},#0C54C2)`, boxShadow: '0 4px 12px rgba(24,119,242,0.3)' }}>
+                  <Link2 size={12} />Connect Meta Ads Account
+                </a>
+              </div>
+            )}
+
+            {/* Account info — show real data when connected, mock otherwise */}
             <div className="grid grid-cols-2 gap-2 mb-5">
-              {[
+              {(isReallyConnected ? [
+                { label: 'Account ID',     value: metaStatus!.ad_account_id ?? '—' },
+                { label: 'Meta User ID',   value: metaStatus!.meta_user_id ?? '—' },
+                { label: 'Connected Since',value: metaStatus!.connected_since ? formatSyncDate(metaStatus!.connected_since) : '—' },
+                { label: 'Token Expires',  value: metaStatus!.expires_at ? `${formatSyncDate(metaStatus!.expires_at)} (${metaStatus!.days_remaining}d)` : '—' },
+              ] : [
                 { label: 'Account ID',     value: metaAccount.accountId },
                 { label: 'Currency',       value: `${metaAccount.currency} · ${metaAccount.timezone.split('/')[1]}` },
                 { label: 'Connected Since',value: formatSyncDate(metaAccount.connectedSince!) },
                 { label: 'Token Expires',  value: `${formatSyncDate(metaAccount.tokenExpiresAt!)} (${metaAccount.daysUntilExpiry}d)` },
-              ].map(({ label, value }) => (
+              ]).map(({ label, value }) => (
                 <div key={label} className="p-3 rounded-xl"
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
                   <p className="text-[10px] text-zinc-600 mb-0.5">{label}</p>
@@ -417,23 +547,43 @@ export default function AdPlatformsPage() {
             </div>
 
             {/* Sync feedback */}
-            {metaSyncDone && (
+            {metaSyncDone && metaSyncResult && (
               <div className="flex items-center gap-2 p-3 rounded-xl mb-3 fade-in-up"
                 style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
                 <CheckCircle size={13} className="text-emerald-400 shrink-0" />
-                <p className="text-xs text-emerald-300">24 ads · 4 campaigns synced successfully</p>
+                <p className="text-xs text-emerald-300">
+                  {metaSyncResult.adsImported} ads · {metaSyncResult.campaignsImported} campaigns synced successfully
+                </p>
+              </div>
+            )}
+            {metaSyncError && (
+              <div className="flex items-center gap-2 p-3 rounded-xl mb-3 fade-in-up"
+                style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.2)' }}>
+                <XCircle size={13} className="text-rose-400 shrink-0" />
+                <p className="text-xs text-rose-300">{metaSyncError}</p>
               </div>
             )}
 
             {/* Action buttons */}
             <div className="flex gap-2">
-              <button onClick={handleMetaSync} disabled={metaSyncing}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
-                style={{ background: 'linear-gradient(135deg,#10B981,#059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}>
-                {metaSyncing
-                  ? <><RefreshCw size={13} className="animate-spin" />Syncing…</>
-                  : <><Zap size={13} />Sync Meta Campaigns</>}
-              </button>
+              {isReallyConnected ? (
+                <button onClick={handleMetaSync} disabled={metaSyncing}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 active:scale-95 disabled:opacity-60"
+                  style={{ background: 'linear-gradient(135deg,#10B981,#059669)', boxShadow: '0 4px 12px rgba(16,185,129,0.2)' }}>
+                  {metaSyncing
+                    ? <><RefreshCw size={13} className="animate-spin" />Syncing…</>
+                    : <><Zap size={13} />Sync Meta Campaigns</>}
+                </button>
+              ) : (
+                <button onClick={handleMetaSync} disabled={metaSyncing || statusLoading}
+                  title="Connect Meta account first to enable real sync"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold text-zinc-400 transition-all hover:opacity-90 active:scale-95 disabled:opacity-40"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  {metaSyncing
+                    ? <><RefreshCw size={13} className="animate-spin" />Syncing…</>
+                    : <><Zap size={13} />Sync Meta Campaigns</>}
+                </button>
+              )}
               <button
                 onClick={() => setShowCampaigns(true)}
                 className="px-4 py-2.5 rounded-xl text-xs font-semibold text-zinc-400 hover:text-white transition-colors flex items-center gap-1.5"
@@ -551,7 +701,7 @@ export default function AdPlatformsPage() {
                 <Badge variant="emerald">{metaCampaigns.filter(c => c.status === 'active').length} active</Badge>
               </div>
               <p className="text-xs text-zinc-600 mt-1">
-                Imported from Meta Business · Last sync {formatSyncDate(mockPlatformAccounts[0].lastSync!)}
+                {isReallyConnected ? 'Live data from Meta Business' : 'Mock data · Connect Meta to see real campaigns'} · Last sync {formatSyncDate(mockPlatformAccounts[0].lastSync!)}
               </p>
             </div>
             <div className="flex items-center gap-2">

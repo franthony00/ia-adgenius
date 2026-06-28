@@ -14,7 +14,8 @@ import ProgressBar from '@/components/ui/ProgressBar';
 import VariationCard from '@/components/ai/VariationCard';
 import { mockAds, mockVariations } from '@/lib/mock-data';
 import { cn, sleep, formatPercent, formatMultiplier } from '@/lib/utils';
-import type { Ad, AIModel, AdVariation, SalesAngle, Platform } from '@/lib/types';
+import { usePlan } from '@/hooks/usePlan';
+import type { Ad, AIModel, AdVariation } from '@/lib/types';
 
 type GenerateMode = 'copy' | 'visual' | 'both';
 type Step = 'config' | 'generating' | 'results';
@@ -29,438 +30,6 @@ const LOADING_MSGS = [
   'Scoring variations...',
   'Finalising output...',
 ];
-
-// ─── Variation template (per ad) ─────────────────────────────────────────────
-interface VariationTemplate {
-  headline: string;
-  description: string;
-  cta: string;
-  imagePrompt: string;
-  changeType: AdVariation['changeType'];
-  rationale: string;
-  predictedCTR: number;
-  predictedCPC: number;
-  predictedROAS: number;
-  confidence: number;
-  angle: SalesAngle;
-  recommendedPlatform: Platform;
-}
-
-// ─── Per-ad variation pools ───────────────────────────────────────────────────
-const AD_VARIATION_POOL: Record<string, VariationTemplate[]> = {
-
-  // ── ad1: FitLife — fitness / facebook / conversions ─────────────────────────
-  ad1: [
-    {
-      headline: 'The 20-Minute Workout Secret 50,000 Athletes Swear By',
-      description: 'Stop spending 2 hours at the gym for worse results. Our AI coach designs your perfect short session — personalised to your body, goals, and schedule.',
-      cta: 'Build My Workout',
-      imagePrompt: 'Split-screen: left frustrated person in crowded gym, right confident athlete finishing 20-min home workout, bright natural light, authentic UGC style',
-      changeType: 'both',
-      rationale: 'Curiosity hook replaces pain-point framing — tests whether aspiration outperforms frustration for this audience.',
-      predictedCTR: 5.4, predictedCPC: 0.82, predictedROAS: 7.8, confidence: 87,
-      angle: 'Curiosidad', recommendedPlatform: 'facebook',
-    },
-    {
-      headline: 'Stop Wasting Hours at the Gym — 20 Minutes Is All You Need',
-      description: '94% of our users see real results in 30 days. If you don\'t, you pay nothing. Your AI coach is waiting.',
-      cta: 'Start Free Trial',
-      imagePrompt: 'Real person doing home workout, sweating authentically, natural morning light, phone showing workout app on floor beside them',
-      changeType: 'copy',
-      rationale: 'Adds time specificity to headline while keeping proven pain-point structure. Low-risk, high-confidence test.',
-      predictedCTR: 5.1, predictedCPC: 0.88, predictedROAS: 7.2, confidence: 91,
-      angle: 'Directa', recommendedPlatform: 'facebook',
-    },
-    {
-      headline: 'Why Are You Still Spending 2 Hours at the Gym?',
-      description: 'Top athletes use AI-optimised 20-minute sessions. 94% of FitLife users outperform their previous 2-hour routines. Try it free — no credit card needed.',
-      cta: 'Try It Free',
-      imagePrompt: 'Overhead shot of athlete checking fitness watch post-20-min session, clean modern home gym, sweat glint on forehead, satisfied expression',
-      changeType: 'both',
-      rationale: 'Question hook triggers self-reflection — audiences who already waste time in the gym will feel seen immediately.',
-      predictedCTR: 4.9, predictedCPC: 0.96, predictedROAS: 6.9, confidence: 79,
-      angle: 'Problema/Solución', recommendedPlatform: 'facebook',
-    },
-    {
-      headline: 'Stop Wasting Hours at the Gym',
-      description: 'Our AI coach builds your perfect 20-min workout. 94% of users see results in 30 days or they get their money back.',
-      cta: 'Start Free Trial',
-      imagePrompt: 'Before/after side-by-side: same person left in cluttered gym looking tired, right at home post-workout looking energised, same outfit, authentic not staged',
-      changeType: 'visual',
-      rationale: 'Copy proven — test whether UGC-style before/after visual boosts CTR without touching the winning headline.',
-      predictedCTR: 5.6, predictedCPC: 0.79, predictedROAS: 7.4, confidence: 84,
-      angle: 'Social Proof', recommendedPlatform: 'instagram',
-    },
-  ],
-
-  // ── ad2: BrewHaven — coffee / instagram / sales ──────────────────────────────
-  ad2: [
-    {
-      headline: 'Your Coffee Was Roasted 48 Hours Ago. Most Aren\'t.',
-      description: 'Single-origin beans. Roasted to order. At your door before you can finish your current bag.',
-      cta: 'Get Fresh Coffee',
-      imagePrompt: 'Close-up of coffee beans being poured, warm amber light, steam rising, artisan roastery feel, golden hour tones',
-      changeType: 'copy',
-      rationale: 'Contrast hook makes competitor staleness visceral without naming anyone — creates instant perceived superiority.',
-      predictedCTR: 4.1, predictedCPC: 1.28, predictedROAS: 5.2, confidence: 76,
-      angle: 'Directa', recommendedPlatform: 'instagram',
-    },
-    {
-      headline: 'The Last Coffee Subscription You\'ll Ever Need',
-      description: 'Your morning deserves single-origin beans roasted to order and delivered within 48 hours. 4.9 ⭐ from 8,400+ subscribers.',
-      cta: 'Start My Subscription',
-      imagePrompt: 'Aesthetic morning flat-lay: coffee mug, BrewHaven bag, open journal, warm window light, Instagram-native composition, cosy tones',
-      changeType: 'both',
-      rationale: 'Finality framing reduces comparison shopping — social proof number anchors credibility.',
-      predictedCTR: 3.8, predictedCPC: 1.42, predictedROAS: 4.9, confidence: 71,
-      angle: 'Emocional', recommendedPlatform: 'instagram',
-    },
-    {
-      headline: 'Your Morning Ritual, Upgraded',
-      description: 'Single-origin beans. Roasted to your order. Delivered fresh within 48 hours of roasting — because mediocre coffee is a terrible way to start the day.',
-      cta: 'Shop Now',
-      imagePrompt: 'Barista pouring latte art in minimalist white mug, cafe counter backdrop blurred, steam rising, warm afternoon light filtering through window',
-      changeType: 'visual',
-      rationale: 'Original copy wins — test whether an artisan café-style visual outperforms the home-ritual imagery.',
-      predictedCTR: 3.5, predictedCPC: 1.55, predictedROAS: 4.5, confidence: 68,
-      angle: 'Emocional', recommendedPlatform: 'instagram',
-    },
-    {
-      headline: 'What If Your Morning Coffee Was Actually Good?',
-      description: 'BrewHaven sources single-origin beans roasted to order and ships within 48 hours. First bag 20% off — no commitment.',
-      cta: 'Claim 20% Off',
-      imagePrompt: 'Person holding coffee mug with both hands, close crop on hands and mug, steam rising, cosy morning light, worn wooden table, simple and intimate',
-      changeType: 'both',
-      rationale: 'Question hook + discount intro offer to convert new audiences unfamiliar with premium coffee subscriptions.',
-      predictedCTR: 4.3, predictedCPC: 1.19, predictedROAS: 5.6, confidence: 81,
-      angle: 'Oferta', recommendedPlatform: 'facebook',
-    },
-  ],
-
-  // ── ad3: NovaSole — shoes / tiktok / traffic ──────────────────────────────────
-  ad3: [
-    {
-      headline: 'Stop Choosing Between Fast and Fresh. NovaSole Does Both.',
-      description: 'PRs on Monday. Brunch fits on Saturday. 12K+ runners and streetwear fans agree — this is the last shoe you need. Starting at $129.',
-      cta: 'Shop the Drop',
-      imagePrompt: 'Dynamic split: left track/running action shot, right urban café scene, same shoe in both, bold graphic transition, Gen-Z energy',
-      changeType: 'both',
-      rationale: 'Removes pause in original copy and makes the dual-identity benefit explicit with social proof + price anchor.',
-      predictedCTR: 6.2, predictedCPC: 0.64, predictedROAS: 5.8, confidence: 85,
-      angle: 'Directa', recommendedPlatform: 'tiktok',
-    },
-    {
-      headline: 'They Said You Can\'t Have Performance AND Style. We Built the Proof.',
-      description: 'NovaSole — fast enough for PRs, clean enough for brunch. 4.9 ⭐ from 12K+ runners. Free 30-day returns.',
-      cta: 'See the Drop',
-      imagePrompt: 'TikTok-native vertical video thumbnail: shoe in centre, gradient split background, bold sans-serif text overlay, high contrast',
-      changeType: 'both',
-      rationale: 'Contrarian hook challenges a category belief — ideal for TikTok where polarising statements drive comment engagement.',
-      predictedCTR: 6.7, predictedCPC: 0.59, predictedROAS: 6.1, confidence: 88,
-      angle: 'Emocional', recommendedPlatform: 'tiktok',
-    },
-    {
-      headline: 'Fast Enough for PRs. Clean Enough for Brunch.',
-      description: '4.9 ⭐ from 12K+ runners. The shoe that doesn\'t make you choose between the track and the table. Starting at $129 — free 30-day returns.',
-      cta: 'Shop the Drop',
-      imagePrompt: 'Slow-motion close-up of NovaSole hitting track then transitioning to cobblestone street, cinematic depth-of-field, golden-hour light, no people',
-      changeType: 'visual',
-      rationale: 'Winning copy unchanged — test cinematic shoe-focus video against lifestyle imagery to find higher-converting creative format.',
-      predictedCTR: 5.9, predictedCPC: 0.71, predictedROAS: 5.5, confidence: 82,
-      angle: 'Social Proof', recommendedPlatform: 'tiktok',
-    },
-    {
-      headline: 'This Shoe Broke My PR. Then I Wore It to Dinner.',
-      description: 'NovaSole — the running shoe the streetwear crowd accidentally adopted. 12K+ ⭐ reviews. Shop the drop before it\'s gone.',
-      cta: 'Get Mine Now',
-      imagePrompt: 'UGC-style phone-camera quality: runner\'s feet on track, cut to same shoes under restaurant table, candid, raw, TikTok-native aesthetic',
-      changeType: 'both',
-      rationale: 'First-person UGC narrative mirrors TikTok storytelling patterns — authentic over polished converts better on this platform.',
-      predictedCTR: 7.1, predictedCPC: 0.55, predictedROAS: 6.3, confidence: 79,
-      angle: 'UGC', recommendedPlatform: 'tiktok',
-    },
-  ],
-
-  // ── ad4: GlowLab — skincare / instagram / conversions ───────────────────────
-  ad4: [
-    {
-      headline: 'Start My 21-Day Skin Transformation',
-      description: 'Dermatologist-formulated. 98% see visible results. No harsh chemicals — just the science your skin has been waiting for.',
-      cta: 'Claim My Free Sample',
-      imagePrompt: 'Clean flatlay of skincare products with subtle before/after skin texture cards, clinical but warm aesthetic, pastel laboratory backdrop',
-      changeType: 'both',
-      rationale: 'Moves CTA copy into headline as action-first hook. Free sample offer lowers barrier vs. risk-free purchase.',
-      predictedCTR: 6.8, predictedCPC: 0.71, predictedROAS: 8.1, confidence: 88,
-      angle: 'Oferta', recommendedPlatform: 'instagram',
-    },
-    {
-      headline: 'Dermatologist-Developed. Actually Works. Here\'s the Proof.',
-      description: '98% of users see visible skin improvement in exactly 21 days — or their money back. No harsh chemicals, no empty promises. Just peer-reviewed science.',
-      cta: 'Try Risk-Free',
-      imagePrompt: 'Close-up of clear, glowing skin texture, soft natural light, no makeup, clinical white background fading into warm skin tone, high-end editorial feel',
-      changeType: 'copy',
-      rationale: '"Here\'s the proof" extends the authority claim into a curiosity hook — makes the user lean forward before seeing the body copy.',
-      predictedCTR: 6.4, predictedCPC: 0.79, predictedROAS: 7.9, confidence: 85,
-      angle: 'Autoridad', recommendedPlatform: 'instagram',
-    },
-    {
-      headline: 'Dermatologist-Developed. Actually Works.',
-      description: '98% see visible improvement in 21 days. No harsh chemicals. No empty promises. Just science.',
-      cta: 'Start My 21-Day Trial',
-      imagePrompt: 'Carousel-style side-by-side: Day 1 vs Day 21 skin texture close-up, clinical lighting, dermatologist\'s gloved hands visible, trust-building aesthetic',
-      changeType: 'visual',
-      rationale: 'Before/after carousel on Instagram typically outperforms single-image for skincare — same proven copy, new creative format.',
-      predictedCTR: 7.0, predictedCPC: 0.67, predictedROAS: 8.4, confidence: 89,
-      angle: 'Social Proof', recommendedPlatform: 'instagram',
-    },
-    {
-      headline: '"My skin cleared in 14 days." — Real GlowLab Customer',
-      description: 'Dermatologist-developed formula. 98% see visible improvement in 21 days. No harsh chemicals. Try risk-free — money back if it doesn\'t work for you.',
-      cta: 'See the Results',
-      imagePrompt: 'UGC-style selfie of woman with clear glowing skin, natural bathroom lighting, slight smile, authentic expression, not overly posed or polished',
-      changeType: 'both',
-      rationale: 'Social proof as headline — quote format on Instagram feels native and disarming, especially for beauty sceptics.',
-      predictedCTR: 6.9, predictedCPC: 0.74, predictedROAS: 8.0, confidence: 83,
-      angle: 'UGC', recommendedPlatform: 'instagram',
-    },
-  ],
-
-  // ── ad5: Nexus AI — SaaS / linkedin / leads ──────────────────────────────────
-  ad5: [
-    {
-      headline: 'Your Competitors Cut Costs 34% Last Year. Did You?',
-      description: 'Over 500 enterprise ops teams use Nexus AI to surface revenue leaks in real-time. Calculate your potential savings in 60 seconds — no commitment.',
-      cta: 'Calculate My ROI',
-      imagePrompt: 'Dashboard interface showing cost reduction graph trending up, dark professional UI, boardroom reflection in monitor, confident executive reviewing data',
-      changeType: 'both',
-      rationale: 'Competitive contrast hook creates FOMO at the executive level — more motivating than generic benefit claims on LinkedIn.',
-      predictedCTR: 2.6, predictedCPC: 3.82, predictedROAS: 10.2, confidence: 83,
-      angle: 'Urgencia', recommendedPlatform: 'linkedin',
-    },
-    {
-      headline: 'How Much Revenue Is Your Ops Team Leaving on the Table?',
-      description: '500+ enterprise teams have answered this question with Nexus AI — average finding: 34% cost reduction in the first 90 days. Calculate yours now.',
-      cta: 'Run My Free Audit',
-      imagePrompt: 'Clean B2B illustration: ops workflow diagram with Nexus AI overlaid, green efficiency arrows, minimal design, LinkedIn-native professional aesthetic',
-      changeType: 'copy',
-      rationale: 'Original question hook kept — swapping CTA to "Free Audit" raises perceived value for enterprise decision-makers.',
-      predictedCTR: 2.3, predictedCPC: 4.10, predictedROAS: 9.6, confidence: 78,
-      angle: 'Oferta', recommendedPlatform: 'linkedin',
-    },
-    {
-      headline: '500 Enterprise Teams. Avg. 34% Cost Reduction. 90 Days.',
-      description: 'Nexus AI analyses your operations in real-time to find what\'s costing you. How much revenue is your team leaving on the table? Find out in 60 seconds.',
-      cta: 'Calculate My Savings',
-      imagePrompt: 'Split infographic: left shows tangled ops workflow (before), right shows clean streamlined flow (after Nexus AI), professional blue-green palette, no clutter',
-      changeType: 'both',
-      rationale: 'Data-first headline leads with proof before the question — ideal for LinkedIn audiences sceptical of ROI claims.',
-      predictedCTR: 2.8, predictedCPC: 3.64, predictedROAS: 11.0, confidence: 86,
-      angle: 'Autoridad', recommendedPlatform: 'linkedin',
-    },
-    {
-      headline: 'How Much Revenue Is Your Ops Team Leaving on the Table?',
-      description: 'Calculate your savings in 60 seconds. 500+ enterprise teams cut costs by avg. 34% with Nexus AI.',
-      cta: 'Calculate My ROI',
-      imagePrompt: 'Executive at glass desk reviewing Nexus AI dashboard on large monitor, city skyline through floor-to-ceiling windows, confident posture, professional attire',
-      changeType: 'visual',
-      rationale: 'Winning copy unchanged — test executive lifestyle visual against product UI screenshot to identify which trust signal converts enterprise leads faster.',
-      predictedCTR: 2.4, predictedCPC: 3.95, predictedROAS: 9.8, confidence: 80,
-      angle: 'Social Proof', recommendedPlatform: 'linkedin',
-    },
-  ],
-
-  // ── ad6: Wanderlux — travel / facebook / sales ──────────────────────────────
-  ad6: [
-    {
-      headline: 'Only 9 Bali Packages Left at $649 — Don\'t Wake Up to Sold Out',
-      description: 'All-inclusive 7-night escape: 5-star resort, private transfers, and daily breakfast. Price locked until Sunday midnight.',
-      cta: 'Lock My Price Now',
-      imagePrompt: 'Aerial drone shot of Bali rice terraces at golden hour, couple in distance on viewing platform, lush greens and warm sky, aspirational and real simultaneously',
-      changeType: 'both',
-      rationale: 'Tightens the scarcity number and adds consequence — loss aversion outperforms FOMO at this audience stage.',
-      predictedCTR: 8.9, predictedCPC: 0.49, predictedROAS: 5.1, confidence: 82,
-      angle: 'Urgencia', recommendedPlatform: 'facebook',
-    },
-    {
-      headline: '72-Hour Flash Sale: Bali from $649',
-      description: 'Only 23 packages left at this price. All-inclusive 7-night escapes with 5-star resorts. Sale ends Sunday.',
-      cta: 'Claim My Package',
-      imagePrompt: 'Split: pool infinity edge overlooking Bali jungle on left, package price badge with countdown timer overlay on right, luxury-meets-urgency visual tension',
-      changeType: 'visual',
-      rationale: 'Original copy kept — test whether a pool/price overlay visual outperforms landscape-only creative at the bottom of the funnel.',
-      predictedCTR: 8.4, predictedCPC: 0.54, predictedROAS: 4.7, confidence: 76,
-      angle: 'Oferta', recommendedPlatform: 'facebook',
-    },
-    {
-      headline: 'You\'re 3 Clicks Away from Bali. $649. 7 Nights. All-In.',
-      description: '5-star resorts, daily breakfast, private transfers — 23 packages left at this price. Sale ends Sunday at midnight.',
-      cta: 'Book Before It\'s Gone',
-      imagePrompt: 'Close-up of hands typing on laptop with Bali resort pool in soft-focus background — buying intent visual meets aspirational destination',
-      changeType: 'both',
-      rationale: 'Process simplification reduces perceived friction for fence-sitters — combines ease with urgency without feeling pushy.',
-      predictedCTR: 9.1, predictedCPC: 0.47, predictedROAS: 5.4, confidence: 84,
-      angle: 'Directa', recommendedPlatform: 'facebook',
-    },
-    {
-      headline: 'Warning: This Bali Deal Expires in 72 Hours',
-      description: 'Flash sale — Bali from $649 all-inclusive. 5-star resorts, private transfers, 7 nights. Only 23 packages remain. Don\'t miss it.',
-      cta: 'See the Deal',
-      imagePrompt: 'Bold graphic with Bali temple silhouette at sunset, large price badge, ticking urgency design element, warm amber palette, feed-stopping composition',
-      changeType: 'both',
-      rationale: '"Warning" pattern interrupt is contrarian for travel ads — creates a reflexive stop-and-read response in a crowded feed.',
-      predictedCTR: 8.6, predictedCPC: 0.52, predictedROAS: 4.9, confidence: 79,
-      angle: 'Urgencia', recommendedPlatform: 'facebook',
-    },
-  ],
-
-  // ── ad7: TasteLab — food / tiktok / conversions ──────────────────────────────
-  ad7: [
-    {
-      headline: 'What If Dinner Actually Impressed People?',
-      description: 'TasteLab delivers restaurant-grade ingredients + foolproof chef recipes. First box 50% off — no cooking experience needed.',
-      cta: 'Get My First Box',
-      imagePrompt: 'TikTok-native: hands plating pasta with tweezers, steam rising, close-up cinematic, warm kitchen lighting, blurred background, aspirational home-chef energy',
-      changeType: 'both',
-      rationale: 'Question hook targets social motivation — impressing people is more powerful than skill-building on TikTok.',
-      predictedCTR: 5.8, predictedCPC: 0.88, predictedROAS: 4.2, confidence: 74,
-      angle: 'Emocional', recommendedPlatform: 'tiktok',
-    },
-    {
-      headline: 'I Made Michelin-Star Pasta in 15 Minutes. Here\'s How.',
-      description: 'TasteLab chef boxes come with restaurant-grade ingredients and step-by-step recipes anyone can follow. First box 50% off.',
-      cta: 'Get My First Box',
-      imagePrompt: 'UGC phone camera: finished pasta dish on wooden table, natural kitchen light, imperfect but delicious-looking, chopsticks and fork beside plate, real home setting',
-      changeType: 'visual',
-      rationale: 'Winning copy kept — test authentic phone-cam UGC aesthetic vs. polished food photography on TikTok to see which converts faster.',
-      predictedCTR: 6.1, predictedCPC: 0.81, predictedROAS: 4.5, confidence: 78,
-      angle: 'UGC', recommendedPlatform: 'tiktok',
-    },
-    {
-      headline: 'The Box That Made Me Look Like I Went to Culinary School',
-      description: 'Restaurant-grade ingredients. Chef-designed recipes. 15 minutes. TasteLab delivers everything you need to cook like a pro — first box 50% off.',
-      cta: 'Try TasteLab',
-      imagePrompt: 'First-person POV: hands opening TasteLab box revealing neatly packaged ingredients, recipe card visible, fresh produce, cinematic unboxing, TikTok vertical',
-      changeType: 'both',
-      rationale: 'Unboxing hook captures TikTok "haul" culture — high completion rate format for subscription food products.',
-      predictedCTR: 6.4, predictedCPC: 0.76, predictedROAS: 4.8, confidence: 81,
-      angle: 'Curiosidad', recommendedPlatform: 'tiktok',
-    },
-    {
-      headline: 'I Made Michelin-Star Pasta in 15 Minutes. Here\'s How.',
-      description: 'Our chefs box delivers restaurant-grade ingredients and foolproof recipes. First box 50% off.',
-      cta: 'Start Cooking',
-      imagePrompt: 'Trending TikTok recipe video thumbnail: ingredients laid out flat on marble, text overlay "15 min Michelin pasta", bold font, warm kitchen tones, viral format',
-      changeType: 'visual',
-      rationale: 'Recipe-thumbnail format mirrors viral TikTok cooking content — native-feeling creative typically outperforms produced ads 2:1 on this platform.',
-      predictedCTR: 7.0, predictedCPC: 0.71, predictedROAS: 5.2, confidence: 76,
-      angle: 'Social Proof', recommendedPlatform: 'tiktok',
-    },
-  ],
-
-  // ── ad8: LuxeThread — fashion / instagram / awareness ─────────────────────
-  ad8: [
-    {
-      headline: 'Your Wardrobe Called. It Wants to Be Curated.',
-      description: 'Sustainable luxury fashion selected by stylists who\'ve dressed for Vogue and Net-a-Porter — and now for your closet.',
-      cta: 'Explore My Edit',
-      imagePrompt: 'Minimalist closet rail with curated sustainable luxury pieces, warm accent lighting, white walls, editorial calm — aspirational but achievable',
-      changeType: 'both',
-      rationale: 'Personalised hook mirrors how LuxeThread\'s curation feels — creates ownership before purchase.',
-      predictedCTR: 3.4, predictedCPC: 1.65, predictedROAS: 3.5, confidence: 72,
-      angle: 'Emocional', recommendedPlatform: 'instagram',
-    },
-    {
-      headline: 'Sustainable Doesn\'t Have to Mean Boring.',
-      description: 'LuxeThread proves it every season. Luxury pieces curated by stylists who\'ve worked with Vogue — made from materials that don\'t cost the earth.',
-      cta: 'Explore Collection',
-      imagePrompt: 'Model in minimalist sustainable luxury outfit against textured natural backdrop, earth tones, confidence posture, editorial lighting, no busy props',
-      changeType: 'both',
-      rationale: 'Directly challenges the #1 objection to sustainable fashion — sceptics who click are already pre-qualified.',
-      predictedCTR: 3.2, predictedCPC: 1.71, predictedROAS: 3.3, confidence: 69,
-      angle: 'Directa', recommendedPlatform: 'instagram',
-    },
-    {
-      headline: 'Dress Like You Mean It',
-      description: 'Sustainable luxury fashion curated by stylists who\'ve dressed for Vogue, Net-a-Porter, and your closet.',
-      cta: 'Explore Collection',
-      imagePrompt: 'Carousel Instagram: each frame a different styled outfit from LuxeThread, consistent warm editorial palette, model and flat-lay alternating, cohesive luxury story',
-      changeType: 'visual',
-      rationale: 'Proven copy, new format — Instagram carousel with styled outfit series drives saves and profile visits better than single-image awareness ads.',
-      predictedCTR: 3.6, predictedCPC: 1.58, predictedROAS: 3.8, confidence: 74,
-      angle: 'Social Proof', recommendedPlatform: 'instagram',
-    },
-    {
-      headline: 'The Pieces Stylists Actually Wear. Now Available to You.',
-      description: 'LuxeThread is curated by the same stylists who dress for Vogue. Sustainable. Luxurious. Yours.',
-      cta: 'Shop the Edit',
-      imagePrompt: 'Behind-the-scenes: stylist\'s own wardrobe rail, handwritten notes on labels, personal feel, sunlight through window — insider access aesthetic',
-      changeType: 'both',
-      rationale: 'Authority transfer hook — "stylists actually wear" implies insider knowledge, which drives aspiration better than generic luxury claims.',
-      predictedCTR: 3.1, predictedCPC: 1.78, predictedROAS: 3.0, confidence: 66,
-      angle: 'Autoridad', recommendedPlatform: 'instagram',
-    },
-  ],
-};
-
-// ─── Generate variations ───────────────────────────────────────────────────────
-function generateVariationsForAd(
-  ad: Ad,
-  mode: GenerateMode,
-  count: number,
-  model: AIModel,
-): AdVariation[] {
-  const pool = AD_VARIATION_POOL[ad.id] ?? [];
-
-  const templates: VariationTemplate[] = pool.length > 0
-    ? pool
-    : [{
-        headline: `${ad.headline} — Proven.`,
-        description: ad.description,
-        cta: ad.cta,
-        imagePrompt: `Professional ad creative for "${ad.name}" — ${ad.platform} format, ${ad.objective} objective`,
-        changeType: 'copy' as const,
-        rationale: 'Adds authority signal to original headline while keeping proven copy structure.',
-        predictedCTR: +(ad.metrics.ctr * 1.1).toFixed(2),
-        predictedCPC: +(ad.metrics.cpc * 0.95).toFixed(2),
-        predictedROAS: +(ad.metrics.roas * 1.05).toFixed(2),
-        confidence: 72,
-        angle: 'Directa' as SalesAngle,
-        recommendedPlatform: ad.platform,
-      }];
-
-  const now = new Date().toISOString();
-
-  return templates.slice(0, count).map((tpl, i): AdVariation => {
-    const headline    = mode === 'visual' ? ad.headline    : tpl.headline;
-    const description = mode === 'visual' ? ad.description : tpl.description;
-    const cta         = mode === 'visual' ? ad.cta         : tpl.cta;
-    const changeType  = mode === 'copy'   ? 'copy'
-                      : mode === 'visual' ? 'visual'
-                      : tpl.changeType;
-
-    return {
-      id: `gen-${ad.id}-${mode}-${i}-${Date.now()}`,
-      originalAdId: ad.id,
-      originalAdName: ad.name,
-      createdAt: now,
-      headline,
-      description,
-      cta,
-      imagePrompt: tpl.imagePrompt,
-      imageUrl: ad.imageUrl,
-      predictedCTR: tpl.predictedCTR,
-      predictedCPC: tpl.predictedCPC,
-      predictedROAS: tpl.predictedROAS,
-      confidence: tpl.confidence,
-      angle: tpl.angle,
-      recommendedPlatform: tpl.recommendedPlatform,
-      status: 'pending',
-      model,
-      rationale: tpl.rationale,
-      changeType,
-    };
-  });
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -502,8 +71,15 @@ export default function GeneratorPage() {
   // localId → DB id (populated after bulk save succeeds)
   const [dbIdMap, setDbIdMap]         = useState<Record<string, string>>({});
   const [savedVariations, setSavedVariations] = useState<AdVariation[]>(mockVariations);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
+  const { variationLimit, planId, loading: planLoading } = usePlan();
   const runIdRef = useRef(0);
+
+  // Clamp count when plan resolves to a lower limit
+  useEffect(() => {
+    if (!planLoading && count > variationLimit) setCount(variationLimit);
+  }, [planLoading, variationLimit, count]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────────
   const resetResults = () => {
@@ -580,17 +156,43 @@ export default function GeneratorPage() {
 
     resetResults();
     setDbIdMap({});
+    setGenerateError(null);
     setStep('generating');
     setProgress(0);
+    setLoadMsg(LOADING_MSGS[0]);
+
+    // Animate progress messages while the API call runs in parallel
+    let msgIdx = 0;
+    const ticker = setInterval(() => {
+      msgIdx = Math.min(msgIdx + 1, LOADING_MSGS.length - 1);
+      setLoadMsg(LOADING_MSGS[msgIdx]);
+      setProgress(Math.round(((msgIdx + 1) / LOADING_MSGS.length) * 90));
+    }, 600);
 
     try {
-      for (let i = 0; i < LOADING_MSGS.length; i++) {
-        setLoadMsg(LOADING_MSGS[i]);
-        setProgress(Math.round(((i + 1) / LOADING_MSGS.length) * 100));
-        await sleep(500 + Math.random() * 300);
-        if (runId !== runIdRef.current) return;
+      const res = await fetch('/api/variations/generate', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ adId: adSnapshot.id, mode, count, model }),
+      });
+
+      clearInterval(ticker);
+      if (runId !== runIdRef.current) return;
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Generation failed' }));
+        setGenerateError(err.error ?? 'Generation failed');
+        setStep('config');
+        return;
       }
-      const variations = generateVariationsForAd(adSnapshot, mode, count, model);
+
+      const data = await res.json();
+      const variations: AdVariation[] = data.variations ?? [];
+
+      setProgress(100);
+      setLoadMsg('Done!');
+      await sleep(300);
+
       if (runId !== runIdRef.current) return;
       setResults(variations);
       setStep('results');
@@ -599,26 +201,28 @@ export default function GeneratorPage() {
       fetch('/api/variations', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ originalAdId: adSnapshot.id, variations }),
+        body:    JSON.stringify({ originalAdId: adSnapshot.id, variations }),
       })
         .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          if (!data?.variations || runId !== runIdRef.current) return;
-          // Build localId → dbId map (order preserved by $transaction)
+        .then(saved => {
+          if (!saved?.variations || runId !== runIdRef.current) return;
           const map: Record<string, string> = {};
-          (data.variations as AdVariation[]).forEach((dbV, i) => {
+          (saved.variations as AdVariation[]).forEach((dbV, i) => {
             map[variations[i].id] = dbV.id;
           });
           setDbIdMap(map);
-          // Refresh the library at the bottom
           return fetch('/api/variations').then(r => r.json());
         })
-        .then(data => {
-          if (data?.variations) setSavedVariations(data.variations);
+        .then(lib => {
+          if (lib?.variations) setSavedVariations(lib.variations);
         })
         .catch(() => { /* silent — local state is still correct */ });
-    } catch {
-      if (runId === runIdRef.current) setStep('config');
+    } catch (err) {
+      clearInterval(ticker);
+      if (runId === runIdRef.current) {
+        setGenerateError(err instanceof Error ? err.message : 'Generation failed');
+        setStep('config');
+      }
     }
   };
 
@@ -693,12 +297,20 @@ export default function GeneratorPage() {
                 <p className="text-xs text-zinc-500 mb-2">
                   Variations: <span className="text-white font-bold">{count}</span>
                 </p>
-                <input type="range" min={1} max={4} value={count}
+                <input type="range" min={1} max={variationLimit} value={count}
                   onChange={e => setCount(+e.target.value)}
                   className="w-full accent-emerald-500" />
                 <div className="flex justify-between text-[10px] text-zinc-700 mt-1">
-                  {[1,2,3,4].map(n => <span key={n}>{n}</span>)}
+                  {Array.from({ length: variationLimit }, (_, i) => i + 1).map(n => (
+                    <span key={n}>{n}</span>
+                  ))}
                 </div>
+                {!planLoading && variationLimit < 4 && (
+                  <p className="text-[10px] text-amber-600 mt-1.5">
+                    {planId === 'starter' ? 'Pro plan unlocks 2 variations · ' : ''}
+                    Performance plan unlocks up to 4
+                  </p>
+                )}
               </div>
 
               {/* Model */}
@@ -740,6 +352,14 @@ export default function GeneratorPage() {
                   <Badge variant="zinc">{count} variant{count > 1 ? 's' : ''}</Badge>
                   <Badge variant="zinc">{selectedAd.platform}</Badge>
                 </div>
+
+                {generateError && (
+                  <div className="flex items-start gap-2 p-3 rounded-xl text-xs text-red-300"
+                    style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <X size={13} className="text-red-400 shrink-0 mt-0.5" />
+                    <span>{generateError}</span>
+                  </div>
+                )}
 
                 <button onClick={generate}
                   className="w-full py-3 rounded-xl text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95"

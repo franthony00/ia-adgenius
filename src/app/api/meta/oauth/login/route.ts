@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { getAuthContext } from '@/lib/auth';
+import { hasFeature } from '@/lib/plan-gates';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
+  const authCtx = await getAuthContext();
+  if (!hasFeature(authCtx.planId, 'meta_connect')) {
+    return NextResponse.json(
+      { error: 'Meta Ads connection requires Performance plan or higher.', requiredPlan: 'performance' },
+      { status: 403 },
+    );
+  }
   const appId       = process.env.META_APP_ID;
   const redirectUri = process.env.META_REDIRECT_URI;
   const stateSecret = process.env.META_OAUTH_STATE_SECRET;

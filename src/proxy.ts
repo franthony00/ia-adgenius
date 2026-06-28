@@ -7,6 +7,7 @@ const isProtectedRoute = createRouteMatcher([
   "/generator(.*)",
   "/history(.*)",
   "/meta-connect(.*)",
+  "/creative-studio(.*)",
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

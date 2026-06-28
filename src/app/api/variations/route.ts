@@ -4,6 +4,7 @@ import { prisma } from '@/lib/db';
 import { getAuthContext } from '@/lib/auth';
 import { mapVariation } from '@/lib/services/mappers';
 import { mockVariations } from '@/lib/mock-data';
+import { hasFeature } from '@/lib/plan-gates';
 // UI string → Prisma enum value
 function unmapAngle(a: string | undefined): string | null {
   if (!a) return null;
@@ -60,8 +61,11 @@ export async function GET(req: Request) {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function POST(req: Request) {
   const authCtx = await getAuthContext();
-  if (authCtx.isDemo) {
-    return NextResponse.json({ error: 'Not available in demo mode' }, { status: 403 });
+  if (!hasFeature(authCtx.planId, 'variations_save')) {
+    return NextResponse.json(
+      { error: 'Saving variations requires Pro plan or higher.', requiredPlan: 'pro' },
+      { status: 403 },
+    );
   }
   try {
     const { originalAdId, variations } = await req.json();

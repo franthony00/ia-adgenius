@@ -269,6 +269,110 @@ export interface PricingPlan {
   actionLabel: string;
 }
 
+// ─── Brand Kit ────────────────────────────────────────────────────────────────
+export interface BrandKit {
+  id: string;
+  workspaceId: string;
+  businessName?: string;
+  logoUrl?: string;
+  primaryColor?: string;
+  secondaryColor?: string;
+  businessType?: string;
+  services: string[];
+  phone?: string;
+  whatsapp?: string;
+  address?: string;
+  instagram?: string;
+  facebook?: string;
+  tone?: string;
+  targetAudience?: string;
+  visualStyle?: string;
+  frequentOffers: string[];
+  preferredCTAs: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Creative Studio ──────────────────────────────────────────────────────────
+export type CreativeFormat =
+  | 'instagram_post' | 'instagram_story' | 'facebook_ad'
+  | 'banner' | 'flyer' | 'whatsapp_status';
+export type CreativeStyle =
+  | 'premium' | 'minimalista' | 'tecnologico' | 'urbano'
+  | 'elegante' | 'comercial' | 'deportivo';
+export type CreativeObjective =
+  | 'awareness' | 'conversions' | 'traffic' | 'leads' | 'retention';
+export type CreativeVariationStatus =
+  | 'draft' | 'generating' | 'ready' | 'approved' | 'rejected';
+
+export interface CreativeVariation {
+  id: string;
+  workspaceId: string;
+  title: string;
+  description?: string;
+  format: CreativeFormat;
+  style: CreativeStyle;
+  objective: CreativeObjective;
+  headline?: string;
+  copy?: string;
+  cta?: string;
+  phone?: string;
+  imagePrompt?: string;
+  imageUrl?: string;
+  status: CreativeVariationStatus;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Learning System ──────────────────────────────────────────────────────────
+export type InsightCategory =
+  | 'copy' | 'visual' | 'audience' | 'platform' | 'cta' | 'angle' | 'timing';
+export type FeedbackType =
+  | 'useful' | 'not_useful' | 'used' | 'saved' | 'winner' | 'failed';
+
+export interface LearningInsight {
+  id: string;
+  workspaceId: string;
+  category: InsightCategory;
+  title: string;
+  description: string;
+  value: string;
+  confidence: number;
+  sampleSize: number;
+  avgCTR?: number;
+  avgROAS?: number;
+  avgCPC?: number;
+  platform?: Platform;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PerformancePattern {
+  id: string;
+  workspaceId: string;
+  patternType: string;
+  patternValue: string;
+  occurrences: number;
+  avgCTR?: number;
+  avgROAS?: number;
+  avgCPC?: number;
+  avgCPA?: number;
+  avgConversions?: number;
+  lastSeen: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface RecommendationFeedback {
+  id: string;
+  workspaceId: string;
+  recommendationId: string;
+  feedbackType: FeedbackType;
+  notes?: string;
+  createdAt: string;
+}
+
 // ─── History Entry ────────────────────────────────────────────────────────────
 export interface HistoryEntry {
   id: string;

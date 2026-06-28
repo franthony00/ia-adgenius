@@ -2,10 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { exchangeCodeForToken, exchangeForLongLivedToken, fetchMetaUserId } from '@/lib/meta/client';
 import { upsertToken } from '@/lib/supabase/meta-repository';
+import { getAuthContext } from '@/lib/auth';
+import { hasFeature } from '@/lib/plan-gates';
 
 export const runtime = 'nodejs';
 
 export async function GET(request: NextRequest) {
+  const authCtx = await getAuthContext();
+  if (!hasFeature(authCtx.planId, 'meta_connect')) {
+    return NextResponse.redirect(
+      new URL('/meta-connect?error=plan_required&requiredPlan=performance', request.url),
+    );
+  }
   const { searchParams } = request.nextUrl;
   const code  = searchParams.get('code');
   const state = searchParams.get('state');

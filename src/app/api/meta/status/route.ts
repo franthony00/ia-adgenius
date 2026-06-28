@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server';
 import { getIntegrationStatus } from '@/lib/supabase/meta-repository';
+import { getAuthContext } from '@/lib/auth';
+import { hasFeature } from '@/lib/plan-gates';
 
 export const runtime = 'nodejs';
 
 export async function GET() {
+  const authCtx = await getAuthContext();
+  if (!hasFeature(authCtx.planId, 'meta_connect')) {
+    return NextResponse.json({ connected: false, planGated: true, requiredPlan: 'performance' });
+  }
   const accountId = process.env.META_AD_ACCOUNT_ID;
   if (!accountId) {
     return NextResponse.json({ connected: false, reason: 'META_AD_ACCOUNT_ID not configured' });

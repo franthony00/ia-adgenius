@@ -14,7 +14,7 @@ import InsightCard from '@/components/ai/InsightCard';
 import Badge from '@/components/ui/Badge';
 import { mockAds, mockAnalyses, globalPatterns } from '@/lib/mock-data';
 import type { AIAnalysis } from '@/lib/types';
-import { formatPercent, formatMultiplier, formatDate, cn, sleep } from '@/lib/utils';
+import { formatPercent, formatMultiplier, formatDate, cn } from '@/lib/utils';
 import type { AIModel, Ad } from '@/lib/types';
 
 // ── Module-level constants (stable across renders) ─────────────────────────
@@ -88,25 +88,59 @@ export default function AnalysisPage() {
 
   const runAnalysis = async () => {
     const runId = ++runIdRef.current;
-    const adId  = selectedAd.id; // snapshot at call time — immune to mid-run selection changes
+    const adId  = selectedAd.id;
 
     setStep('loading');
     setProgress(0);
-    setLoadingText('');
+    setLoadingText(ANALYSIS_STEPS[0]);
+
+    // Animate steps while the real API call runs in parallel
+    let stepIdx = 0;
+    const stepInterval = setInterval(() => {
+      stepIdx = Math.min(stepIdx + 1, ANALYSIS_STEPS.length - 1);
+      if (runId === runIdRef.current) {
+        setLoadingText(ANALYSIS_STEPS[stepIdx]);
+        setProgress(Math.round(((stepIdx + 1) / ANALYSIS_STEPS.length) * 80)); // up to 80%
+      }
+    }, 1800);
 
     try {
-      for (let i = 0; i < ANALYSIS_STEPS.length; i++) {
-        setLoadingText(ANALYSIS_STEPS[i]);
-        setProgress(Math.round(((i + 1) / ANALYSIS_STEPS.length) * 100));
-        await sleep(600);
-        // Bail out if the user changed the ad or triggered a new run while we waited
-        if (runId !== runIdRef.current) return;
+      const res = await fetch('/api/analyses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adId, model }),
+      });
+
+      clearInterval(stepInterval);
+      if (runId !== runIdRef.current) return;
+
+      if (!res.ok) {
+        // Fall back to existing analyses on error
+        const found = analyses.find((a: AIAnalysis) => a.adId === adId) ?? analyses[0] ?? mockAnalyses[0];
+        setActiveAnalysis(found);
+        setStep('done');
+        return;
       }
-      const found = analyses.find((a: AIAnalysis) => a.adId === adId) ?? analyses[0] ?? mockAnalyses[0];
-      setActiveAnalysis(found);
+
+      const data = await res.json() as { analysis: AIAnalysis };
+      setProgress(100);
+      setLoadingText('Analysis complete!');
+
+      // Add to local state if it's a new entry
+      setAnalyses((prev: AIAnalysis[]) => {
+        const exists = prev.some((a) => a.id === data.analysis.id);
+        return exists ? prev : [data.analysis, ...prev];
+      });
+      setActiveAnalysis(data.analysis);
       setStep('done');
     } catch {
-      if (runId === runIdRef.current) setStep('idle');
+      clearInterval(stepInterval);
+      if (runId === runIdRef.current) {
+        // Still show result from existing analyses on network error
+        const found = analyses.find((a: AIAnalysis) => a.adId === adId) ?? analyses[0] ?? mockAnalyses[0];
+        setActiveAnalysis(found);
+        setStep('done');
+      }
     }
   };
 

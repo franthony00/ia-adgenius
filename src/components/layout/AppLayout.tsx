@@ -1,4 +1,5 @@
 import Sidebar from './Sidebar';
+import NovaChat from '@/components/ai/NovaChat';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -7,6 +8,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <main className="flex-1 lg:ml-64 min-h-screen flex flex-col overflow-x-hidden">
         {children}
       </main>
+      <NovaChat />
     </div>
   );
 }
