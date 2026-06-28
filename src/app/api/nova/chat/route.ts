@@ -178,37 +178,102 @@ function getDemoReply(message: string, tier: NovaTier, intent?: string): string 
     return 'Los planes de AdGenius:\n\n• **Starter $19/mes** — generación básica, 1 workspace\n• **Pro $79/mes** — análisis IA, variaciones A/B, historial, 3 workspaces\n• **Performance $149/mes** — conexión Meta/Google Ads, métricas reales\n• **Agency $299/mes** — múltiples clientes, team, reportes\n• **Enterprise $599+/mes** — white-label, automatizaciones custom\n\nPuedes cambiar tu plan en la sección **Billing** del sidebar. ¿Necesitas ayuda para elegir?';
   }
 
-  // ── Keyword fallback por tema ─────────────────────────────────────────────
-  if (lower.includes('analiz') || lower.includes('rendimiento') || lower.includes('roas') || lower.includes('ctr') || lower.includes('cpc') || lower.includes('métrica') || lower.includes('metrica')) {
-    if (!tierAtLeast(tier, 'PRO')) {
-      return 'El análisis avanzado de métricas está disponible en el plan **Performance** ($149/mes). Incluye ROAS real, CTR, CPC y recomendaciones basadas en tus datos.\n\nMientras tanto, ¿qué métrica te preocupa? Te explico qué significa y cómo mejorarla.';
+  // ── Mejorar copy con texto proporcionado ─────────────────────────────────
+  // Detect "mejora este copy: [text]" before generic copy handler
+  if (
+    (lower.includes('mejora') || lower.includes('mejorar') || lower.includes('optimiza') || lower.includes('reescribe')) &&
+    message.includes(':') &&
+    message.length > 15
+  ) {
+    const colonIdx = message.indexOf(':');
+    const original = message.slice(colonIdx + 1).trim();
+    if (original.length > 3) {
+      return `**Versiones mejoradas de: _"${original}"_**\n\n**A — Beneficio directo:**\n"${original} — rápido, confiable y sin sorpresas."\n\n**B — Prueba social:**\n"Más de 1.000 clientes lo eligieron. ¿Eres el siguiente?"\n\n**C — Urgencia + garantía:**\n"Resolvemos eso hoy mismo — con garantía incluida."\n\n**Qué mejoró:** hook más claro, beneficio visible y CTA con acción directa.\n\n¿En qué plataforma va a publicarse? Te ajusto el tono.`;
     }
-    return 'Dime qué métrica te preocupa y te explico exactamente qué está pasando y cómo mejorarlo:\n\n• **CTR bajo** → creative o audiencia\n• **CPC alto** → relevancia o targeting\n• **ROAS insuficiente** → oferta o landing page\n• **Frecuencia alta** → fatiga de anuncio';
   }
 
+  // ── Creative Studio ───────────────────────────────────────────────────────
+  if (
+    lower.includes('creative studio') ||
+    lower.includes('creatividad') || lower.includes('creatividades') ||
+    lower.includes('visual') || lower.includes('imagen') ||
+    lower.includes('formato') || lower.includes('banner') ||
+    lower.includes('story') || lower.includes('reel') ||
+    lower.includes('diseño') || lower.includes('diseno')
+  ) {
+    return 'El **Creative Studio** de AdGenius te permite generar y adaptar creatividades visuales para distintos formatos:\n\n- **Post cuadrado (1:1)** → Feed de Instagram y Facebook\n- **Story vertical (9:16)** → Instagram Stories, TikTok y Reels\n- **Banner horizontal (16:9)** → YouTube y Display\n- **Carrusel** → mostrar varios productos o beneficios en secuencia\n\n**Cómo usarlo:**\n1. Ve al sidebar → **Creative Studio**\n2. Sube o describe tu concepto\n3. Elige el formato y plataforma\n4. La IA adapta el texto y el diseño\n\n¿Para qué plataforma y formato necesitas crear la creatividad?';
+  }
+
+  // ── A/B Testing ───────────────────────────────────────────────────────────
+  if (
+    lower.includes('a/b') || lower.includes('ab test') || lower.includes('split test') ||
+    lower.includes('variaci') || lower.includes('testear') || lower.includes('comparar anuncio') ||
+    (lower.includes('prueba') && (lower.includes('anuncio') || lower.includes('copy') || lower.includes('ad')))
+  ) {
+    return '**Guía de pruebas A/B en AdGenius:**\n\n**Regla base:** testa un solo elemento por vez.\n\n- **Headline A vs B** → mismo copy, diferente apertura\n- **Imagen A vs B** → mismo texto, diferente visual\n- **CTA A vs B** → "Comprar ahora" vs "Ver oferta"\n\n**Duración mínima:** 3-5 días o 100 conversiones por variante.\n\n**Métricas para elegir ganador:**\n- **CTR** → cuál genera más clics\n- **CPC** → cuál es más eficiente\n- **ROAS** → cuál genera más retorno\n\n**En AdGenius:** usa el **Generator** para crear variaciones y el **AI Analysis** para comparar el score de cada una antes de publicar.\n\n¿Qué elemento quieres testear primero?';
+  }
+
+  // ── Métricas: CTR, CPC, CPM, CPA, ROAS ───────────────────────────────────
+  if (
+    lower.includes('analiz') || lower.includes('rendimiento') ||
+    lower.includes('roas') || lower.includes('ctr') || lower.includes('cpc') ||
+    lower.includes('cpm') || lower.includes('cpa') ||
+    lower.includes('métrica') || lower.includes('metrica') ||
+    lower.includes('conversión') || lower.includes('conversion') ||
+    lower.includes('impresion') || lower.includes('impresión')
+  ) {
+    const metricsGuide = '**Guía de métricas publicitarias:**\n\n- **CTR (Click-Through Rate)** → % de personas que hacen clic. Bajo CTR = problema de creative o audiencia\n- **CPC (Costo por Clic)** → cuánto pagas por cada clic. CPC alto = baja relevancia del anuncio\n- **CPM (Costo por Mil impresiones)** → costo de mostrar el anuncio 1.000 veces. CPM alto = audiencia muy competida\n- **CPA (Costo por Adquisición)** → cuánto cuesta conseguir un cliente/lead. CPA alto = problema en landing o embudo\n- **ROAS (Return on Ad Spend)** → retorno por cada $ invertido. ROAS de 3x = ganas $3 por cada $1\n\n**Señales de alarma:**\n- CTR < 1% → cambiar creative\n- ROAS < 2x → revisar oferta o landing page\n- Frecuencia > 3.5 → fatiga creativa, rotar anuncios\n\n¿Cuál de estas métricas te preocupa?';
+    if (!tierAtLeast(tier, 'PRO')) {
+      return `${metricsGuide}\n\nEl análisis automático de tus métricas reales está disponible en el plan **Performance** ($149/mes).`;
+    }
+    return metricsGuide;
+  }
+
+  // ── Brand Kit ─────────────────────────────────────────────────────────────
+  if (
+    lower.includes('marca') || lower.includes('branding') || lower.includes('identidad') ||
+    lower.includes('brand kit') || lower.includes('logo') || lower.includes('color') ||
+    lower.includes('tono de') || lower.includes('voz de')
+  ) {
+    return 'Para un branding sólido en publicidad digital:\n\n- **Consistencia visual** — mismo color, tipografía y tono en todos los anuncios\n- **Voz de marca** — ¿formal, cercano, inspiracional? Define uno y manténlo\n- **Brand Kit en AdGenius** — configurá tus colores, CTAs frecuentes y tono en Settings → Brand Kit\n\nTener el Brand Kit configurado permite que la IA genere copies y creatividades alineadas con tu identidad de marca automáticamente.\n\n¿Quieres ayuda para definir el tono de comunicación de tu marca?';
+  }
+
+  // ── Ideas de anuncios ─────────────────────────────────────────────────────
   if (lower.includes('idea') || lower.includes('anuncio') || lower.includes('ángulo') || lower.includes('angulo') || lower.includes('audiencia')) {
     return 'Los ángulos que mejor convierten:\n\n1. **Problema/Solución** — ideal para productos nuevos\n2. **Social Proof** — "X personas ya lo usan"\n3. **Urgencia real** — plazos o cupos limitados\n4. **Curiosidad** — "El error que comete el 90% de negocios"\n5. **Autoridad** — testimonios con resultados concretos\n\n¿Cuál se ajusta mejor a tu producto?';
   }
 
+  // ── Campañas y redes ──────────────────────────────────────────────────────
   if (lower.includes('campaña') || lower.includes('facebook') || lower.includes('instagram') || lower.includes('meta') || lower.includes('tiktok')) {
     return 'Para una campaña efectiva en redes:\n\n**1. Objetivo claro** — Conversiones > Tráfico > Alcance\n**2. Creative fuerte** — Video 15-30s supera a imagen en 60%\n**3. Hook en las primeras 3 palabras** — determina si siguen leyendo\n**4. Audiencia específica** — Lookalike 1% de compradores recientes\n**5. Budget mínimo** — $10/día por ad set para que el algoritmo aprenda\n\n¿Qué estás vendiendo? Te armo la estructura completa.';
   }
 
-  if (lower.includes('copy') || lower.includes('texto') || lower.includes('mejorar') || lower.includes('headline') || lower.includes('cta') || lower.includes('publicación') || lower.includes('publicacion') || lower.includes('post')) {
-    return 'Para mejorar cualquier copy o publicación:\n\n1. **Hook fuerte** — las primeras 3 palabras detienen el scroll\n2. **Beneficio concreto** — "ahorra 2h diarias" vs "es eficiente"\n3. **Una sola idea** — no abrumes con información\n4. **CTA directo** — "Descargá gratis" convierte 40% más que "Enviar"\n\nCompárteme el texto y te doy una versión mejorada lista para publicar.';
+  // ── Copy y textos ─────────────────────────────────────────────────────────
+  if (
+    lower.includes('copy') || lower.includes('texto') || lower.includes('mejorar') ||
+    lower.includes('headline') || lower.includes('cta') ||
+    lower.includes('publicación') || lower.includes('publicacion') || lower.includes('post')
+  ) {
+    return 'Para mejorar cualquier copy o publicación:\n\n1. **Hook fuerte** — las primeras 3 palabras detienen el scroll\n2. **Beneficio concreto** — "ahorra 2h diarias" vs "es eficiente"\n3. **Una sola idea** — no abrumes con información\n4. **CTA directo** — "Descargá gratis" convierte 40% más que "Enviar"\n\nCompárteme el texto así: _"Mejora este copy: [tu texto]"_ y te doy una versión mejorada lista para publicar.';
   }
 
-  if (lower.includes('marca') || lower.includes('branding') || lower.includes('identidad') || lower.includes('brand kit') || lower.includes('logo') || lower.includes('color')) {
-    return 'Para un branding sólido en publicidad digital:\n\n• **Consistencia visual** — mismo color, tipografía y tono en todos los anuncios\n• **Voz de marca** — ¿formal, cercano, inspiracional? Define uno y manténlo\n• **Brand Kit en AdGenius** — configurá tus colores, CTAs frecuentes y tono en Settings → Brand Kit\n\n¿Quieres ayuda para definir el tono de comunicación de tu marca?';
+  // ── Demo / funciones disponibles ──────────────────────────────────────────
+  if (
+    lower.includes('demo') || lower.includes('gratis') ||
+    lower.includes('qué puedo') || lower.includes('que puedo') ||
+    lower.includes('funciones') || lower.includes('disponible') ||
+    lower.includes('sin plan') || lower.includes('prueba gratuita')
+  ) {
+    return 'En el **modo demo de AdGenius** tienes acceso a:\n\n✅ **Nova** — asistente de marketing con respuestas sobre AdGenius, copies, campañas y más\n✅ **Dashboard** — vista general de tu workspace\n✅ **Ad Library** — organiza y guarda anuncios\n✅ **Generator** — genera variaciones básicas de copy\n✅ **Creative Studio** — adapta creatividades a distintos formatos\n\n❌ Conexión Meta/Google Ads → plan Performance+\n❌ Análisis IA en tiempo real → plan Pro+\n❌ Historial y recomendaciones → plan Pro+\n\n¿Quieres que te explique alguna función en detalle?';
   }
 
-  // Saludo genérico
+  // ── Saludo genérico ───────────────────────────────────────────────────────
   if (lower.includes('hola') || lower.includes('buenos') || lower.includes('buenas') || lower.includes('hey') || lower.includes('qué tal') || lower.includes('que tal')) {
-    return '¡Hola! 👋 ¿En qué te puedo ayudar hoy?\n\nPuedo ayudarte con **anuncios, publicaciones, campañas, copy o cualquier cosa de AdGenius**. Solo dime qué necesitas.';
+    return '¡Hola! 👋 Soy **NOVA**, tu asistente de AdGenius. Puedo ayudarte a crear mejores anuncios, mejorar tus copies, analizar ideas y generar recomendaciones para tus campañas.\n\n¿En qué empezamos?';
   }
 
-  // Fallback inteligente
-  return `Cuéntame un poco más sobre lo que necesitas. Para darte la mejor respuesta sobre **"${message.slice(0, 50)}${message.length > 50 ? '...' : ''}"** ayuda saber:\n\n• ¿Es para un anuncio, publicación o campaña?\n• ¿En qué plataforma? (Meta, Google, TikTok, Instagram)\n• ¿Cuál es tu objetivo? (ventas, leads, awareness)\n\nCon eso te doy algo concreto y útil.`;
+  // ── Fallback inteligente ──────────────────────────────────────────────────
+  return `Cuéntame un poco más sobre lo que necesitas. Para darte la mejor respuesta sobre **"${message.slice(0, 50)}${message.length > 50 ? '...' : ''}"** ayuda saber:\n\n- ¿Es para un anuncio, publicación o campaña?\n- ¿En qué plataforma? (Meta, Google, TikTok, Instagram)\n- ¿Cuál es tu objetivo? (ventas, leads, awareness)\n\nCon eso te doy algo concreto y útil.`;
 }
 
 export async function POST(req: NextRequest) {
@@ -258,8 +323,8 @@ export async function POST(req: NextRequest) {
     // Demo mode — no API key configured
     return NextResponse.json({
       reply: getDemoReply(message, tier, intent),
+      mode:  'demo',
       gated: false,
-      demo: true,
     });
   }
 
@@ -310,16 +375,19 @@ export async function POST(req: NextRequest) {
 
     return new Response(readable, {
       headers: {
-        'Content-Type':    'text/plain; charset=utf-8',
+        'Content-Type':      'text/plain; charset=utf-8',
         'Transfer-Encoding': 'chunked',
-        'X-Nova-Tier':     tier,
+        'X-Nova-Tier':       tier,
+        'X-Nova-Mode':       'live',
       },
     });
   } catch (err) {
     console.error('[POST /api/nova/chat]', err);
-    return NextResponse.json(
-      { error: 'NOVA is temporarily unavailable' },
-      { status: 500 },
-    );
+    // Anthropic unavailable — fall back to demo silently instead of showing an error
+    return NextResponse.json({
+      reply: getDemoReply(message, tier, intent),
+      mode:  'demo',
+      gated: false,
+    });
   }
 }

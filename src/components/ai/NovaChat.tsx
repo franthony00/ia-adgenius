@@ -261,6 +261,8 @@ export default function NovaChat() {
   const [input,     setInput]     = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [usageCount, setUsageCount] = useState(0);
+  // isDemo: true when the server responds without ANTHROPIC_API_KEY or Anthropic fails
+  const [isDemo,    setIsDemo]    = useState(false);
 
   const messagesEndRef      = useRef<HTMLDivElement>(null);
   const inputRef            = useRef<HTMLTextAreaElement>(null);
@@ -366,14 +368,19 @@ export default function NovaChat() {
           signal: abortRef.current.signal,
         });
 
-        // Check if response is JSON (gated / error) vs a stream
+        // Check if response is JSON (demo / gated / error) vs a stream
         const contentType = res.headers.get('content-type') ?? '';
         if (contentType.includes('application/json')) {
           const data = await res.json() as {
             reply?: string;
             error?: string;
             gated?: boolean;
+            mode?:  'demo' | 'live';
           };
+
+          // Track demo mode: server has no API key or Anthropic fell back
+          if (data.mode === 'demo') setIsDemo(true);
+
           const replyText =
             data.reply ??
             data.error ??
@@ -389,7 +396,10 @@ export default function NovaChat() {
           return;
         }
 
-        // Streaming response
+        // Streaming response — always live mode
+        const novaMode = res.headers.get('x-nova-mode');
+        if (novaMode === 'live') setIsDemo(false);
+
         const reader = res.body?.getReader();
         if (!reader) throw new Error('No response body');
 
@@ -597,6 +607,21 @@ export default function NovaChat() {
                 }}>
                   {badge.label}
                 </span>
+                {/* Demo mode badge — only when API key is absent */}
+                {isDemo && (
+                  <span style={{
+                    fontSize:      9,
+                    fontWeight:    600,
+                    padding:       '2px 5px',
+                    borderRadius:  3,
+                    background:    'rgba(107,114,128,0.12)',
+                    color:         '#9ca3af',
+                    letterSpacing: '0.4px',
+                    border:        '1px solid rgba(107,114,128,0.2)',
+                  }}>
+                    Demo
+                  </span>
+                )}
               </div>
               <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>
                 Asistente de publicidad IA
