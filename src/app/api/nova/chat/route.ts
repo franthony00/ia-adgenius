@@ -14,14 +14,16 @@ function buildSystemPrompt(tier: NovaTier): string {
   return `Eres NOVA, el asistente inteligente de AdGenius. Eres experto en marketing digital, publicidad en redes sociales, copywriting, creación de anuncios y estrategias de crecimiento para marcas.
 
 ## Sobre AdGenius
-AdGenius es una plataforma SaaS de publicidad digital impulsada por IA. Sus funciones principales son:
-- **Dashboard**: métricas de campañas, ROAS, CTR, gasto e ingresos en tiempo real
+AdGenius es una plataforma de publicidad digital con IA diseñada para ayudar a negocios, marcas y creadores a crear, organizar, analizar y mejorar sus anuncios desde un solo lugar.
+
+Sus secciones principales son:
+- **Dashboard**: métricas de campañas en tiempo real — ROAS, CTR, gasto e ingresos
 - **Ad Library**: biblioteca de todos los anuncios del workspace con filtros por plataforma y estado
 - **AI Analysis**: análisis IA de cada anuncio — score, fortalezas, debilidades y recomendaciones
 - **Generator**: generador de variaciones A/B de copy e imagen para anuncios existentes
 - **History**: historial completo de acciones y análisis realizados
-- **Ad Platforms**: conexión con Meta Ads y Google Ads para importar campañas reales
-- **Creative Studio**: generador de creatividades visuales para diferentes formatos
+- **Ad Platforms**: conexión con Meta Ads y Google Ads para importar campañas reales (plan Performance+)
+- **Creative Studio**: generador de creatividades visuales para diferentes formatos y plataformas
 
 Planes disponibles:
 - **Starter ($19/mes)**: generación básica, 1 workspace, sin conexión a plataformas
@@ -29,6 +31,8 @@ Planes disponibles:
 - **Performance ($149/mes)**: conexión Meta/Google Ads, métricas reales, recomendaciones inteligentes
 - **Agency ($299/mes)**: múltiples clientes, team members, reportes
 - **Enterprise ($599+/mes)**: white-label, automatizaciones personalizadas
+
+Cuando el usuario pregunte "¿Qué es AdGenius?", "¿De qué trata la página?" o algo similar, responde de forma conversacional: primero explica el propósito general de la plataforma en 1-2 oraciones, luego lista las funciones principales, y cierra con una frase que resuma el valor (ej: "AdGenius es tu copiloto de marketing"). NO respondas solo con una lista fría.
 
 ## Tono y estilo
 Habla siempre en español. Sé cercano, directo y útil — como un asesor de marketing que conoce la plataforma por dentro. Respuestas concisas y accionables. Usa negritas para destacar lo importante. No hagas preguntas retóricas innecesarias.
@@ -153,8 +157,17 @@ function getDemoReply(message: string, tier: NovaTier, intent?: string): string 
   }
 
   // ── Preguntas sobre AdGenius / NOVA ──────────────────────────────────────
-  if (lower.includes('adgenius') || lower.includes('plataforma') || lower.includes('página') || lower.includes('pagina') || lower.includes('sirve') || lower.includes('para qué') || lower.includes('para que')) {
-    return '**AdGenius** es una plataforma de publicidad digital con IA. Desde aquí podés:\n\n• 📊 **Dashboard** — ver métricas de tus campañas en tiempo real\n• 🖼️ **Ad Library** — gestionar todos tus anuncios\n• 🤖 **AI Analysis** — obtener análisis IA de cada anuncio\n• ✨ **Generator** — generar variaciones A/B automáticamente\n• 📡 **Ad Platforms** — conectar Meta Ads y Google Ads (plan Performance+)\n• 🎨 **Creative Studio** — crear creatividades para distintos formatos\n\n¿Querés que te explique alguna sección en detalle?';
+  if (
+    lower.includes('adgenius') ||
+    lower.includes('plataforma') ||
+    lower.includes('página') || lower.includes('pagina') ||
+    lower.includes('qué es') || lower.includes('que es') ||
+    lower.includes('de qué trata') || lower.includes('de que trata') ||
+    lower.includes('explícame') || lower.includes('explicame') ||
+    lower.includes('sirve') || lower.includes('para qué') || lower.includes('para que') ||
+    lower.includes('trata la') || lower.includes('qué hace') || lower.includes('que hace')
+  ) {
+    return 'AdGenius es una plataforma de publicidad digital con IA diseñada para ayudarte a **crear mejores anuncios, organizar tus campañas y tomar mejores decisiones de marketing**. La idea es que tengas en un solo lugar tus métricas, anuncios, análisis, ideas creativas y recomendaciones para mejorar el rendimiento de tus campañas.\n\nDentro de la plataforma puedes:\n\n- **Dashboard** — revisar métricas principales de tus campañas en tiempo real\n- **Ad Library** — guardar y organizar todos tus anuncios por plataforma y estado\n- **AI Analysis** — analizar cada pieza publicitaria con IA para entender qué mejorar\n- **Generator** — generar nuevos copies o variaciones A/B a partir de anuncios existentes\n- **Ad Platforms** — conectar Meta Ads o Google Ads e importar campañas reales (plan Performance+)\n- **Creative Studio** — crear y adaptar creatividades visuales para distintos formatos\n\nEn pocas palabras, AdGenius funciona como un **copiloto de marketing**: te ayuda a crear, mejorar y entender tus anuncios para que tu marca pueda comunicar mejor y vender más.\n\n¿Quieres que te explique alguna sección en detalle?';
   }
 
   if (lower.includes('nova') || lower.includes('asistente') || lower.includes('qué puedes') || lower.includes('que puedes') || lower.includes('cómo funciona') || lower.includes('como funciona')) {
