@@ -30,6 +30,7 @@ const MOCK_RESPONSE = {
 function buildPerformanceLoop(ads: any[]): PerformanceLoopEntry[] {
   return ads.slice(0, 8).map(ad => {
     const latestAnalysis  = ad.analyses?.[0] ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const variationStatuses: string[] = (ad.variations ?? []).map((v: any) => v.status);
     const testingCount  = variationStatuses.filter(s => s === 'testing').length;
     const approvedCount = variationStatuses.filter(s => s === 'approved').length;
