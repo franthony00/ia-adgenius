@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ClerkProvider } from '@clerk/nextjs';
+import NovaGlobal from '@/components/layout/NovaGlobal';
 
 export const metadata: Metadata = {
   title: 'AdGenius — Creative Ads Dashboard',
@@ -46,7 +47,10 @@ const clerkAppearance = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const html = (
     <html lang="en" className="h-full">
-      <body className="h-full antialiased">{children}</body>
+      <body className="h-full antialiased">
+          {children}
+          <NovaGlobal />
+        </body>
     </html>
   );
 

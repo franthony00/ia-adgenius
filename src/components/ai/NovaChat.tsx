@@ -298,6 +298,11 @@ export default function NovaChat() {
   const caps = NOVA_CAPABILITIES[NOVA_TIER_MAP[planId as PlanId] ?? 'PLUS'];
   const badge = TIER_BADGE[tier];
 
+  // Log Nova mode whenever it changes
+  useEffect(() => {
+    console.log('[NOVA] mode:', isDemo ? 'demo' : 'live');
+  }, [isDemo]);
+
   // Build history from messages for the API
   function buildHistory(): Array<{ role: 'user' | 'assistant'; content: string }> {
     return messages
@@ -515,7 +520,7 @@ export default function NovaChat() {
           alignItems:   'center',
           justifyContent: 'center',
           boxShadow:    '0 4px 24px rgba(139,92,246,0.45)',
-          zIndex:       9998,
+          zIndex:       9999,
           transition:   'transform 0.18s ease, box-shadow 0.18s ease',
         }}
         onMouseEnter={e => {
