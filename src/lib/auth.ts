@@ -6,7 +6,7 @@ export const DEMO_USER_ID      = 'demo-user';
 export const DEMO_WORKSPACE_ID = 'demo-workspace';
 
 /** Emails that bypass all plan gates and get enterprise-level access. */
-export const ADMIN_EMAILS = ['franthonysanchez77@gmail.com'];
+export const ADMIN_EMAILS = ['franthony007@gmail.com'];
 
 export interface AuthContext {
   userId: string;
@@ -19,11 +19,59 @@ export interface AuthContext {
 }
 
 /**
+ * Ensures the user has a Workspace and WorkspaceMember record.
+ *
+ * Three scenarios handled:
+ *   1. No membership → creates Workspace + WorkspaceMember with role owner.
+ *   2. Membership exists but role is not owner and user is admin → updates to owner.
+ *   3. Membership exists and role is correct → returns existing workspaceId.
+ *
+ * Receives dbUserId (the actual User.id from Neon) so FK constraints are
+ * always satisfied regardless of whether User.id is a Clerk ID or a legacy CUID.
+ */
+async function ensureUserWorkspace(
+  dbUserId: string,
+  name:     string,
+  isAdmin:  boolean,
+): Promise<string> {
+  const membership = await prisma.workspaceMember.findFirst({
+    where:  { userId: dbUserId },
+    select: { id: true, workspaceId: true, role: true },
+  });
+
+  if (membership) {
+    // Admin must always be owner — fix if role drifted
+    if (isAdmin && membership.role !== 'owner') {
+      await prisma.workspaceMember.update({
+        where: { id: membership.id },
+        data:  { role: 'owner' },
+      });
+    }
+    return membership.workspaceId;
+  }
+
+  // No workspace — create one and add member as owner
+  const slug      = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
+  const workspace = await prisma.workspace.create({
+    data: {
+      name:    `${name}'s Workspace`,
+      slug,
+      members: { create: { userId: dbUserId, role: 'owner' } },
+    },
+  });
+  return workspace.id;
+}
+
+/**
  * Returns the current user's DB ids and active plan.
  *
  * - If Clerk is not configured → demo mode (no sign-in required), planId 'pro'.
- * - If user is signed in       → upserts User + Workspace on first visit.
+ * - If user is signed in       → syncs User → Workspace → WorkspaceMember on every call.
  * - If Clerk fails unexpectedly → falls back to demo mode.
+ *
+ * User lookup uses email as the upsert key so records that were created with a
+ * CUID primary key are found correctly without triggering the email unique constraint.
+ * New users are always created with User.id = Clerk userId.
  */
 export async function getAuthContext(): Promise<AuthContext> {
   const demo: AuthContext = {
@@ -44,50 +92,36 @@ export async function getAuthContext(): Promise<AuthContext> {
     const avatarUrl = clerkUser?.imageUrl ?? null;
 
     // ── Admin check happens FIRST, before any DB call ──────────────────────
-    // This guarantees enterprise access even if the DB is temporarily unavailable.
+    // Guarantees enterprise access even if the DB is temporarily unavailable.
     const isAdmin = ADMIN_EMAILS.includes(email);
 
-    // ── DB operations (non-blocking for admins if they fail) ───────────────
+    // ── DB sync ────────────────────────────────────────────────────────────
     try {
-      // Upsert user — Clerk userId is stored as the primary key
-      await prisma.user.upsert({
-        where:  { id: clerkId },
+      // Upsert by email — handles both cases:
+      //   • New users:    creates User with id = Clerk userId
+      //   • Legacy users: finds existing record (id may be a CUID) and updates name/avatar
+      // Avoids UniqueConstraintViolation when the user already exists with a
+      // non-Clerk primary key, which previously caused workspace creation to fail silently.
+      const dbUser = await prisma.user.upsert({
+        where:  { email },
         create: { id: clerkId, email, name, avatarUrl },
         update: { name, avatarUrl },
       });
 
-      // Find existing workspace membership
-      const membership = await prisma.workspaceMember.findFirst({
-        where:  { userId: clerkId },
-        select: { workspaceId: true },
+      // Ensure Workspace + WorkspaceMember exist; fix role for admin if needed
+      const workspaceId = await ensureUserWorkspace(dbUser.id, name, isAdmin);
+
+      const sub = await prisma.subscription.findUnique({
+        where:  { workspaceId },
+        select: { planId: true },
       });
+      const planId: PlanId = isAdmin ? 'enterprise' : (sub?.planId ?? 'pro') as PlanId;
 
-      if (membership) {
-        const wsId = membership.workspaceId;
-        const sub  = await prisma.subscription.findUnique({
-          where:  { workspaceId: wsId },
-          select: { planId: true },
-        });
-        const planId: PlanId = isAdmin ? 'enterprise' : (sub?.planId ?? 'pro') as PlanId;
-        return { userId: clerkId, workspaceId: wsId, isDemo: false, planId, isAdmin };
-      }
-
-      // First login: create a default workspace automatically
-      const slug      = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
-      const workspace = await prisma.workspace.create({
-        data: {
-          name:    `${name}'s Workspace`,
-          slug,
-          members: { create: { userId: clerkId, role: 'owner' } },
-        },
-      });
-
-      return { userId: clerkId, workspaceId: workspace.id, isDemo: false, planId: isAdmin ? 'enterprise' : 'pro', isAdmin };
+      return { userId: clerkId, workspaceId, isDemo: false, planId, isAdmin };
 
     } catch (dbErr) {
       console.error('[getAuthContext] DB error:', dbErr);
-      // If DB fails but user is authenticated, return best-effort context.
-      // Admins always get enterprise; regular users get pro (generous fallback).
+      // Admins always get enterprise; regular users get pro as a generous fallback.
       return {
         userId:      clerkId,
         workspaceId: DEMO_WORKSPACE_ID,
