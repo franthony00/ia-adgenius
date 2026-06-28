@@ -1,7 +1,9 @@
-'use client';
-
+import dynamic from 'next/dynamic';
 import Sidebar from './Sidebar';
-import NovaChat from '@/components/ai/NovaChat';
+
+// Load NovaChat only on the client — it uses localStorage, window, and portals
+// that cause hydration mismatches when server-rendered.
+const NovaChat = dynamic(() => import('@/components/ai/NovaChat'), { ssr: false });
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
