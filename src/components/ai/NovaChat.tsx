@@ -149,6 +149,108 @@ function TypingDots() {
   );
 }
 
+// ─── Quick Actions ────────────────────────────────────────────────────────────
+
+interface QuickActionsProps {
+  tier: NovaTier;
+  onQuickAction: (id: string, prompt: string, required: NovaTier) => void;
+}
+
+function QuickActions({ tier, onQuickAction }: QuickActionsProps) {
+  return (
+    <div style={{ marginTop: 4 }}>
+      <div style={{ fontSize: 10, fontWeight: 600, color: '#4b5563', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 2 }}>
+        Acciones rápidas
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {NOVA_QUICK_ACTIONS.map(action => {
+          const locked = !tierAtLeast(tier, action.requiredTier);
+          return (
+            <button
+              key={action.id}
+              onClick={() => onQuickAction(action.id, action.prompt, action.requiredTier)}
+              style={{
+                display:      'flex',
+                alignItems:   'center',
+                gap:          10,
+                padding:      '9px 12px',
+                borderRadius: 10,
+                background:   locked ? 'rgba(255,255,255,0.02)' : 'rgba(99,102,241,0.08)',
+                border:       locked ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(99,102,241,0.2)',
+                cursor:       'pointer',
+                textAlign:    'left',
+                width:        '100%',
+                transition:   'background 0.15s, border-color 0.15s',
+                opacity:      locked ? 0.6 : 1,
+              }}
+              onMouseEnter={e => {
+                if (!locked) {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(99,102,241,0.14)';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(99,102,241,0.35)';
+                }
+              }}
+              onMouseLeave={e => {
+                if (!locked) {
+                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(99,102,241,0.08)';
+                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(99,102,241,0.2)';
+                }
+              }}
+            >
+              <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{action.icon}</span>
+              <span style={{ flex: 1, fontSize: 13, color: locked ? '#6b7280' : '#d1d5db', fontWeight: 500 }}>
+                {action.label}
+              </span>
+              {locked ? (
+                <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  <Lock size={12} color="#6b7280" />
+                  <span style={{
+                    fontSize: 9, fontWeight: 700,
+                    color:       action.requiredTier === 'PRO' ? '#a855f7' : '#818cf8',
+                    background:  action.requiredTier === 'PRO' ? 'rgba(168,85,247,0.12)' : 'rgba(129,140,248,0.12)',
+                    padding: '2px 5px', borderRadius: 4, letterSpacing: '0.3px',
+                  }}>
+                    {action.requiredTier}
+                  </span>
+                </span>
+              ) : (
+                <Zap size={13} color="#6366F1" style={{ flexShrink: 0 }} />
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ─── Welcome Screen ───────────────────────────────────────────────────────────
+
+interface WelcomeScreenProps {
+  tier: NovaTier;
+  caps: ReturnType<typeof import('@/lib/nova-capabilities').getNovaCapabilities>;
+  onQuickAction: (id: string, prompt: string, required: NovaTier) => void;
+}
+
+function WelcomeScreen({ tier, onQuickAction }: WelcomeScreenProps) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '4px 0' }}>
+      <div style={{ textAlign: 'center', padding: '16px 8px 8px' }}>
+        <div style={{
+          width: 56, height: 56, borderRadius: '50%',
+          background: 'linear-gradient(135deg, #6366F1, #A855F7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          margin: '0 auto 12px', boxShadow: '0 4px 20px rgba(139,92,246,0.35)',
+        }}>
+          <span style={{ fontWeight: 800, fontSize: 24, color: '#fff' }}>N</span>
+        </div>
+        <div style={{ fontWeight: 700, fontSize: 16, color: '#f1f5f9', marginBottom: 4 }}>Hola, soy NOVA</div>
+        <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>Tu asistente de publicidad IA. ¿En qué te ayudo hoy?</div>
+      </div>
+      <QuickActions tier={tier} onQuickAction={onQuickAction} />
+    </div>
+  );
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function NovaChat() {
@@ -638,193 +740,6 @@ export default function NovaChat() {
         </div>
       )}
     </>
-  );
-}
-
-// ─── Quick Actions (shown below welcome bubble) ───────────────────────────────
-
-interface QuickActionsProps {
-  tier: NovaTier;
-  onQuickAction: (id: string, prompt: string, required: NovaTier) => void;
-}
-
-function QuickActions({ tier, onQuickAction }: QuickActionsProps) {
-  return (
-    <div style={{ marginTop: 4 }}>
-      <div style={{ fontSize: 10, fontWeight: 600, color: '#4b5563', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 2 }}>
-        Acciones rápidas
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {NOVA_QUICK_ACTIONS.map(action => {
-          const locked = !tierAtLeast(tier, action.requiredTier);
-          return (
-            <button
-              key={action.id}
-              onClick={() => onQuickAction(action.id, action.prompt, action.requiredTier)}
-              style={{
-                display:      'flex',
-                alignItems:   'center',
-                gap:          10,
-                padding:      '9px 12px',
-                borderRadius: 10,
-                background:   locked ? 'rgba(255,255,255,0.02)' : 'rgba(99,102,241,0.08)',
-                border:       locked
-                  ? '1px solid rgba(255,255,255,0.05)'
-                  : '1px solid rgba(99,102,241,0.2)',
-                cursor:       'pointer',
-                textAlign:    'left',
-                width:        '100%',
-                transition:   'background 0.15s, border-color 0.15s',
-                opacity:      locked ? 0.6 : 1,
-              }}
-              onMouseEnter={e => {
-                if (!locked) {
-                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(99,102,241,0.14)';
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(99,102,241,0.35)';
-                }
-              }}
-              onMouseLeave={e => {
-                if (!locked) {
-                  (e.currentTarget as HTMLButtonElement).style.background = 'rgba(99,102,241,0.08)';
-                  (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(99,102,241,0.2)';
-                }
-              }}
-            >
-              <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>{action.icon}</span>
-              <span style={{ flex: 1, fontSize: 13, color: locked ? '#6b7280' : '#d1d5db', fontWeight: 500 }}>
-                {action.label}
-              </span>
-              {locked ? (
-                <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                  <Lock size={12} color="#6b7280" />
-                  <span style={{
-                    fontSize:     9,
-                    fontWeight:   700,
-                    color:        action.requiredTier === 'PRO' ? '#a855f7' : '#818cf8',
-                    background:   action.requiredTier === 'PRO' ? 'rgba(168,85,247,0.12)' : 'rgba(129,140,248,0.12)',
-                    padding:      '2px 5px',
-                    borderRadius: 4,
-                    letterSpacing: '0.3px',
-                  }}>
-                    {action.requiredTier}
-                  </span>
-                </span>
-              ) : (
-                <Zap size={13} color="#6366F1" style={{ flexShrink: 0 }} />
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Welcome Screen ───────────────────────────────────────────────────────────
-
-interface WelcomeScreenProps {
-  tier: NovaTier;
-  caps: ReturnType<typeof import('@/lib/nova-capabilities').getNovaCapabilities>;
-  onQuickAction: (id: string, prompt: string, required: NovaTier) => void;
-}
-
-function WelcomeScreen({ tier, onQuickAction }: WelcomeScreenProps) {
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, padding: '4px 0' }}>
-      {/* Hero */}
-      <div style={{ textAlign: 'center', padding: '16px 8px 8px' }}>
-        <div style={{
-          width:          56,
-          height:         56,
-          borderRadius:   '50%',
-          background:     'linear-gradient(135deg, #6366F1, #A855F7)',
-          display:        'flex',
-          alignItems:     'center',
-          justifyContent: 'center',
-          margin:         '0 auto 12px',
-          boxShadow:      '0 4px 20px rgba(139,92,246,0.35)',
-        }}>
-          <span style={{ fontWeight: 800, fontSize: 24, color: '#fff' }}>N</span>
-        </div>
-        <div style={{ fontWeight: 700, fontSize: 16, color: '#f1f5f9', marginBottom: 4 }}>
-          Hola, soy NOVA
-        </div>
-        <div style={{ fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
-          Tu asistente de publicidad IA. ¿En qué te ayudo hoy?
-        </div>
-      </div>
-
-      {/* Quick actions */}
-      <div>
-        <div style={{ fontSize: 10, fontWeight: 600, color: '#4b5563', letterSpacing: '0.8px', textTransform: 'uppercase', marginBottom: 8, paddingLeft: 2 }}>
-          Acciones rápidas
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          {NOVA_QUICK_ACTIONS.map(action => {
-            const locked = !tierAtLeast(tier, action.requiredTier);
-            return (
-              <button
-                key={action.id}
-                onClick={() => onQuickAction(action.id, action.prompt, action.requiredTier)}
-                style={{
-                  display:       'flex',
-                  alignItems:    'center',
-                  gap:           10,
-                  padding:       '10px 12px',
-                  borderRadius:  10,
-                  background:    locked ? 'rgba(255,255,255,0.02)' : 'rgba(99,102,241,0.08)',
-                  border:        locked
-                    ? '1px solid rgba(255,255,255,0.05)'
-                    : '1px solid rgba(99,102,241,0.2)',
-                  cursor:        'pointer',
-                  textAlign:     'left',
-                  width:         '100%',
-                  transition:    'background 0.15s, border-color 0.15s',
-                  opacity:       locked ? 0.6 : 1,
-                }}
-                onMouseEnter={e => {
-                  if (!locked) {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(99,102,241,0.14)';
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(99,102,241,0.35)';
-                  }
-                }}
-                onMouseLeave={e => {
-                  if (!locked) {
-                    (e.currentTarget as HTMLButtonElement).style.background = 'rgba(99,102,241,0.08)';
-                    (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(99,102,241,0.2)';
-                  }
-                }}
-              >
-                <span style={{ fontSize: 18, lineHeight: 1, flexShrink: 0 }}>
-                  {action.icon}
-                </span>
-                <span style={{ flex: 1, fontSize: 13, color: locked ? '#6b7280' : '#d1d5db', fontWeight: 500 }}>
-                  {action.label}
-                </span>
-                {locked ? (
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                    <Lock size={12} color="#6b7280" />
-                    <span style={{
-                      fontSize:     9,
-                      fontWeight:   700,
-                      color:        action.requiredTier === 'PRO' ? '#a855f7' : '#818cf8',
-                      background:   action.requiredTier === 'PRO' ? 'rgba(168,85,247,0.12)' : 'rgba(129,140,248,0.12)',
-                      padding:      '2px 5px',
-                      borderRadius: 4,
-                      letterSpacing: '0.3px',
-                    }}>
-                      {action.requiredTier}
-                    </span>
-                  </span>
-                ) : (
-                  <Zap size={13} color="#6366F1" style={{ flexShrink: 0 }} />
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-    </div>
   );
 }
 
