@@ -43,44 +43,61 @@ export async function getAuthContext(): Promise<AuthContext> {
                       || email.split('@')[0];
     const avatarUrl = clerkUser?.imageUrl ?? null;
 
-    // Upsert user — Clerk userId is stored as the primary key
-    await prisma.user.upsert({
-      where:  { id: clerkId },
-      create: { id: clerkId, email, name, avatarUrl },
-      update: { name, avatarUrl },
-    });
-
-    // Find existing workspace membership
-    const membership = await prisma.workspaceMember.findFirst({
-      where:  { userId: clerkId },
-      select: { workspaceId: true },
-    });
-
+    // ── Admin check happens FIRST, before any DB call ──────────────────────
+    // This guarantees enterprise access even if the DB is temporarily unavailable.
     const isAdmin = ADMIN_EMAILS.includes(email);
 
-    if (membership) {
-      const wsId = membership.workspaceId;
-      const sub  = await prisma.subscription.findUnique({
-        where:  { workspaceId: wsId },
-        select: { planId: true },
+    // ── DB operations (non-blocking for admins if they fail) ───────────────
+    try {
+      // Upsert user — Clerk userId is stored as the primary key
+      await prisma.user.upsert({
+        where:  { id: clerkId },
+        create: { id: clerkId, email, name, avatarUrl },
+        update: { name, avatarUrl },
       });
-      const planId: PlanId = isAdmin ? 'enterprise' : (sub?.planId ?? 'pro') as PlanId;
-      return { userId: clerkId, workspaceId: wsId, isDemo: false, planId, isAdmin };
+
+      // Find existing workspace membership
+      const membership = await prisma.workspaceMember.findFirst({
+        where:  { userId: clerkId },
+        select: { workspaceId: true },
+      });
+
+      if (membership) {
+        const wsId = membership.workspaceId;
+        const sub  = await prisma.subscription.findUnique({
+          where:  { workspaceId: wsId },
+          select: { planId: true },
+        });
+        const planId: PlanId = isAdmin ? 'enterprise' : (sub?.planId ?? 'pro') as PlanId;
+        return { userId: clerkId, workspaceId: wsId, isDemo: false, planId, isAdmin };
+      }
+
+      // First login: create a default workspace automatically
+      const slug      = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
+      const workspace = await prisma.workspace.create({
+        data: {
+          name:    `${name}'s Workspace`,
+          slug,
+          members: { create: { userId: clerkId, role: 'owner' } },
+        },
+      });
+
+      return { userId: clerkId, workspaceId: workspace.id, isDemo: false, planId: isAdmin ? 'enterprise' : 'pro', isAdmin };
+
+    } catch (dbErr) {
+      console.error('[getAuthContext] DB error:', dbErr);
+      // If DB fails but user is authenticated, return best-effort context.
+      // Admins always get enterprise; regular users get pro (generous fallback).
+      return {
+        userId:      clerkId,
+        workspaceId: DEMO_WORKSPACE_ID,
+        isDemo:      false,
+        planId:      isAdmin ? 'enterprise' : 'pro',
+        isAdmin,
+      };
     }
-
-    // First login: create a default workspace automatically
-    const slug      = `${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`;
-    const workspace = await prisma.workspace.create({
-      data: {
-        name:    `${name}'s Workspace`,
-        slug,
-        members: { create: { userId: clerkId, role: 'owner' } },
-      },
-    });
-
-    return { userId: clerkId, workspaceId: workspace.id, isDemo: false, planId: isAdmin ? 'enterprise' : 'pro', isAdmin };
   } catch (err) {
-    console.error('[getAuthContext]', err);
+    console.error('[getAuthContext] Clerk error:', err);
     return demo;
   }
 }
