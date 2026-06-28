@@ -66,14 +66,26 @@ function renderMarkdown(text: string): React.ReactNode[] {
       return <span key={pi}>{part}</span>;
     });
 
-    const isBullet = line.trimStart().startsWith('• ') || line.trimStart().startsWith('* ');
+    const isBullet = line.trimStart().startsWith('• ') || line.trimStart().startsWith('* ') || line.trimStart().startsWith('- ');
     const isNumbered = /^\s*\d+\./.test(line);
 
     if (isBullet) {
+      // Strip the leading bullet char so we don't render double bullets
+      const stripped = line.trimStart().replace(/^[•*-]\s+/, '');
+      const bulletParts = stripped.split(/(\*\*[^*]+\*\*)/g).map((part, pi) => {
+        if (part.startsWith('**') && part.endsWith('**')) {
+          return (
+            <strong key={pi} style={{ fontWeight: 700, color: '#e2e8f0' }}>
+              {part.slice(2, -2)}
+            </strong>
+          );
+        }
+        return <span key={pi}>{part}</span>;
+      });
       return (
-        <span key={li} style={{ display: 'block', paddingLeft: '12px', position: 'relative' }}>
+        <span key={li} style={{ display: 'block', paddingLeft: '14px', position: 'relative', marginBottom: '2px' }}>
           <span style={{ position: 'absolute', left: 0, color: '#8B5CF6' }}>•</span>
-          {rendered}
+          {bulletParts}
           {li < lines.length - 1 && <br />}
         </span>
       );
