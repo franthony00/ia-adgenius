@@ -73,7 +73,6 @@ export default function VariationCard({
   const hasNew   = Boolean(onUse || onSaveDraft || onMarkABTest || onCompare);
   const hasLegacy = !hasNew && variation.status === 'pending' && (onApprove || onReject);
 
-  const isPending  = variation.status === 'pending';
   const isUsed     = variation.status === 'approved';
   const isDraft    = variation.status === 'draft';
   const isTesting  = variation.status === 'testing';

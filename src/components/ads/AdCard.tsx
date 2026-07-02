@@ -4,7 +4,7 @@ import SafeAdImage from '@/components/ui/SafeAdImage';
 import Link from 'next/link';
 import { TrendingUp, Eye, MousePointer, Star } from 'lucide-react';
 import type { Ad } from '@/lib/types';
-import { cn, formatCurrency, formatNumber, formatPercent, formatMultiplier, getStatusColor, getPlatformLabel, getPlatformColor } from '@/lib/utils';
+import { cn, formatNumber, formatPercent, formatMultiplier, getStatusColor, getPlatformLabel, getPlatformColor } from '@/lib/utils';
 import Badge from '@/components/ui/Badge';
 
 interface AdCardProps { ad: Ad; delay?: number; }

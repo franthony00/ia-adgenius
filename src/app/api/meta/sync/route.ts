@@ -12,7 +12,7 @@ import { hasFeature } from '@/lib/plan-gates';
 export const runtime    = 'nodejs';
 export const maxDuration = 300; // 5 min timeout for large accounts
 
-export async function POST(request: NextRequest) {
+export async function POST(_request: NextRequest) {
   const authCtx = await getAuthContext();
   if (!hasFeature(authCtx.planId, 'meta_connect')) {
     return NextResponse.json(

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import SafeAdImage from '@/components/ui/SafeAdImage';
 import {
   Sparkles, Wand2, RefreshCw, Check, ChevronRight,
-  ImageIcon, FileText, Zap, GitBranch, BarChart2,
+  ImageIcon, FileText, Zap, BarChart2,
   X, TrendingUp, Info,
 } from 'lucide-react';
 import AppLayout from '@/components/layout/AppLayout';
@@ -48,12 +48,6 @@ export default function GeneratorPage() {
       .catch(() => { /* keep mock defaults */ });
   }, []);
 
-  useEffect(() => {
-    fetch('/api/variations')
-      .then(r => r.json())
-      .then(data => { if (data.variations) setSavedVariations(data.variations); })
-      .catch(() => { /* keep mock defaults */ });
-  }, []);
   const [mode, setMode]               = useState<GenerateMode>('both');
   const [model, setModel]             = useState<AIModel>('claude-3-5-sonnet');
   const [count, setCount]             = useState(2);
@@ -73,11 +67,19 @@ export default function GeneratorPage() {
   const [savedVariations, setSavedVariations] = useState<AdVariation[]>(mockVariations);
   const [generateError, setGenerateError] = useState<string | null>(null);
 
+  useEffect(() => {
+    fetch('/api/variations')
+      .then(r => r.json())
+      .then(data => { if (data.variations) setSavedVariations(data.variations); })
+      .catch(() => { /* keep mock defaults */ });
+  }, []);
+
   const { variationLimit, planId, loading: planLoading } = usePlan();
   const runIdRef = useRef(0);
 
   // Clamp count when plan resolves to a lower limit
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!planLoading && count > variationLimit) setCount(variationLimit);
   }, [planLoading, variationLimit, count]);
 

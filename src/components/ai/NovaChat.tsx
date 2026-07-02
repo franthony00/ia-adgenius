@@ -271,6 +271,7 @@ export default function NovaChat() {
 
   // Read usage from localStorage on mount
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setUsageCount(readUsageCount());
   }, []);
 
@@ -418,8 +419,7 @@ export default function NovaChat() {
           ),
         );
 
-        // eslint-disable-next-line no-constant-condition
-        while (true) {
+        while (true) { // streaming loop — exits on done
           const { done, value } = await reader.read();
           if (done) break;
 

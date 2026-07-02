@@ -355,9 +355,6 @@ export default function CreativeStudioPage() {
   const [isDemo, setIsDemo]         = useState(false);
   const [preview, setPreview]       = useState<CreativeVariation | null>(null);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { Promise.all([fetchVariations(), fetchBrandKit()]); }, []);
-
   async function fetchVariations() {
     setLoading(true);
     try {
@@ -385,6 +382,9 @@ export default function CreativeStudioPage() {
       }
     } catch { /* silent */ }
   }
+
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { void Promise.all([fetchVariations(), fetchBrandKit()]); }, []);
 
   function showToast(msg: string) {
     setToast(msg);

@@ -108,8 +108,7 @@ function isOffTopic(lower: string): boolean {
   return offTopicPatterns.some(p => p.test(lower));
 }
 
-function getOffTopicReply(message: string): string {
-  const topic = message.slice(0, 40).trim();
+function getOffTopicReply(_message: string): string {
   return `Ese tema está fuera de mi especialidad 😊 Soy NOVA y me enfoco en publicidad, marketing y AdGenius.\n\nPero si quieres, puedo ayudarte a **crear un anuncio o campaña** relacionada con lo que mencionas. ¿Lo intentamos?`;
 }
 

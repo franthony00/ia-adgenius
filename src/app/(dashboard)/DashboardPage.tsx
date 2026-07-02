@@ -61,12 +61,6 @@ const STAGE_META: Record<string, { label: string; color: string }> = {
   improve:  { label: 'Improve',  color: '#34D399' },
 };
 
-const IMPACT_COLOR: Record<string, string> = {
-  high:   'text-rose-400',
-  medium: 'text-amber-400',
-  low:    'text-zinc-500',
-};
-
 const CONFIDENCE_COLOR: Record<string, string> = {
   high:   'text-emerald-400',
   medium: 'text-amber-400',

@@ -34,6 +34,7 @@ export default function LibraryPage() {
       .finally(() => setIsLoading(false));
   }, []);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadAds(); }, [loadAds]);
 
   const filtered = useMemo(() => {

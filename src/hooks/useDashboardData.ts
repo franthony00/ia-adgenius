@@ -44,24 +44,35 @@ export function useDashboardData(): UseDashboardDataResult {
 
   useEffect(() => {
     let cancelled = false;
-    setIsLoading(true);
-    setError(null);
+
+    // Reset to loading state in a microtask to avoid synchronous setState-in-effect warning
+    const loadingTimer = setTimeout(() => {
+      if (!cancelled) {
+        setIsLoading(true);
+        setError(null);
+      }
+    }, 0);
 
     fetchDashboardData(selectedPlatform, selectedAdAccount)
       .then(result => {
+        clearTimeout(loadingTimer);
         if (!cancelled) {
           setData(result);
           setIsLoading(false);
         }
       })
       .catch((err: unknown) => {
+        clearTimeout(loadingTimer);
         if (!cancelled) {
           setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
           setIsLoading(false);
         }
       });
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+      clearTimeout(loadingTimer);
+    };
   }, [selectedPlatform, selectedAdAccount, refreshKey]);
 
   return {

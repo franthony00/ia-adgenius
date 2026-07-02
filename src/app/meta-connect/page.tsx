@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import {
-  RefreshCw, CheckCircle, XCircle, AlertTriangle, ArrowRight,
+  RefreshCw, CheckCircle, XCircle, AlertTriangle,
   BarChart3, Zap, Clock, TrendingUp, TrendingDown,
   ExternalLink, Download, ChevronRight, Info,
   Globe, Layers, X, Link2,
@@ -15,7 +15,7 @@ import {
   mockPlatformAccounts, mockImportedCampaigns,
   mockSyncHistory, mockPlatformRecommendations,
 } from '@/lib/mock-data';
-import { formatCurrency, formatPercent, formatMultiplier, sleep } from '@/lib/utils';
+import { formatCurrency, formatPercent, formatMultiplier } from '@/lib/utils';
 import type { ImportedCampaign } from '@/lib/types';
 import { usePlan } from '@/hooks/usePlan';
 
@@ -285,6 +285,7 @@ function CampaignsModal({ campaigns, onClose }: { campaigns: ImportedCampaign[];
 function GoogleComingSoonToast({ onClose }: { onClose: () => void }) {
   // Stable ref so the effect never re-runs when the parent re-renders
   const onCloseRef = useRef(onClose);
+  // eslint-disable-next-line react-hooks/refs
   onCloseRef.current = onClose;
 
   useEffect(() => {
@@ -360,8 +361,7 @@ export default function AdPlatformsPage() {
   const [metaStatus, setMetaStatus]           = useState<MetaStatus | null>(null);
   const [statusLoading, setStatusLoading]     = useState(true);
 
-  const metaAccount   = mockPlatformAccounts.find(a => a.platform === 'meta')!;
-  const googleAccount = mockPlatformAccounts.find(a => a.platform === 'google')!;
+  const metaAccount = mockPlatformAccounts.find(a => a.platform === 'meta')!;
   const metaCampaigns = mockImportedCampaigns.filter(c => c.platform === 'meta');
 
   // Derived KPIs
