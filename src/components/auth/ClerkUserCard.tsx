@@ -4,6 +4,8 @@ import { useUser, UserButton, useClerk } from '@clerk/nextjs';
 import { LogOut } from 'lucide-react';
 import { usePlan } from '@/hooks/usePlan';
 
+const ADMIN_EMAILS_CLIENT = ['franthony007@gmail.com'];
+
 const PLAN_LABEL: Record<string, string> = {
   starter:     'Starter Plan',
   pro:         'Pro Plan',
@@ -37,8 +39,11 @@ export default function ClerkUserCard() {
     );
   }
 
-  const name      = user?.fullName ?? user?.emailAddresses[0]?.emailAddress ?? 'User';
-  const planLabel = planLoading ? '…' : (PLAN_LABEL[planId] ?? `${planId} Plan`);
+  const email           = user?.emailAddresses[0]?.emailAddress;
+  const isAdminClient   = ADMIN_EMAILS_CLIENT.includes(email ?? '');
+  const effectivePlanId = isAdminClient ? 'enterprise' : planId;
+  const name            = user?.fullName ?? email ?? 'User';
+  const planLabel       = planLoading ? '…' : (PLAN_LABEL[effectivePlanId] ?? `${effectivePlanId} Plan`);
 
   return (
     <div

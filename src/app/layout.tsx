@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { ClerkProvider } from '@clerk/nextjs';
-import NovaGlobal from '@/components/layout/NovaGlobal';
+import dynamic from 'next/dynamic';
+
+const NovaGlobal = dynamic(() => import('@/components/layout/NovaGlobal'), { ssr: false });
 
 export const metadata: Metadata = {
   title: 'AdGenius — Creative Ads Dashboard',
