@@ -308,14 +308,58 @@ function BrandKitPane() {
 }
 
 // ─── Billing pane (shown when Settings → Billing Plan is active) ───────────────
-function BillingPane({ onAction }: { onAction: () => void }) {
+function BillingPane({ onContactSales }: { onContactSales: () => void }) {
   const { planId, loading: planLoading } = usePlan();
   const activePlanId  = planId ?? 'pro';
   const currentPlan   = pricingPlans.find(p => p.id === activePlanId) ?? pricingPlans[1];
   const currentIdx    = PLAN_ORDER.indexOf(activePlanId);
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [portalLoading, setPortalLoading] = useState(false);
+  const [billingError, setBillingError]   = useState<string | null>(null);
+
+  async function handleUpgrade(targetPlanId: string) {
+    setLoadingPlan(targetPlanId);
+    setBillingError(null);
+    try {
+      const res  = await fetch('/api/billing/checkout', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ planId: targetPlanId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Checkout failed');
+      window.location.href = data.url;
+    } catch (err) {
+      setBillingError(err instanceof Error ? err.message : 'Something went wrong');
+      setLoadingPlan(null);
+    }
+  }
+
+  async function handleManageBilling() {
+    setPortalLoading(true);
+    setBillingError(null);
+    try {
+      const res  = await fetch('/api/billing/portal', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Portal failed');
+      window.location.href = data.url;
+    } catch (err) {
+      setBillingError(err instanceof Error ? err.message : 'Something went wrong');
+      setPortalLoading(false);
+    }
+  }
 
   return (
     <div className="space-y-5">
+
+      {/* Error banner */}
+      {billingError && (
+        <div className="rounded-xl px-4 py-3 flex items-center gap-2 text-[10px] font-semibold text-amber-300"
+          style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+          <AlertTriangle size={12} className="shrink-0" />
+          {billingError}
+        </div>
+      )}
 
       {/* Current plan summary */}
       <div className="rounded-xl p-4"
@@ -336,22 +380,15 @@ function BillingPane({ onAction }: { onAction: () => void }) {
             </div>
             <div className="flex items-center gap-3 text-[10px] text-zinc-600">
               <span>{currentPlan.priceLabel}</span>
-              <span>·</span>
-              <span>Renewal: Jun 2026</span>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
             <button
-              onClick={onAction}
-              className="px-3 py-1.5 rounded-lg text-[10px] font-semibold text-zinc-400 hover:text-white transition-colors text-center"
+              onClick={handleManageBilling}
+              disabled={portalLoading}
+              className="px-3 py-1.5 rounded-lg text-[10px] font-semibold text-zinc-400 hover:text-white transition-colors text-center disabled:opacity-50"
               style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              Manage Billing
-            </button>
-            <button
-              onClick={onAction}
-              className="px-3 py-1.5 rounded-lg text-[10px] font-semibold text-white transition-all hover:opacity-90 text-center"
-              style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}>
-              Change Plan
+              {portalLoading ? <RefreshCw size={10} className="animate-spin inline" /> : 'Manage Billing'}
             </button>
           </div>
         </div>
@@ -373,6 +410,13 @@ function BillingPane({ onAction }: { onAction: () => void }) {
             const actionStyle = ACTION_STYLE[derivedAction];
             const isCurrent   = derivedAction === 'current';
             const badge       = plan.badge && plan.badgeVariant ? BADGE_STYLE[plan.badgeVariant] : null;
+            const isLoading   = loadingPlan === plan.id;
+
+            function handlePlanClick() {
+              if (isCurrent) return;
+              if (derivedAction === 'contact') { onContactSales(); return; }
+              handleUpgrade(plan.id);
+            }
 
             return (
               <div
@@ -423,19 +467,22 @@ function BillingPane({ onAction }: { onAction: () => void }) {
 
                 {/* CTA button */}
                 <button
-                  onClick={isCurrent ? undefined : onAction}
-                  disabled={isCurrent}
+                  onClick={handlePlanClick}
+                  disabled={isCurrent || isLoading || !!loadingPlan}
                   className="w-full py-2 rounded-lg text-[10px] font-bold transition-all hover:opacity-90 active:scale-[0.98] disabled:cursor-default flex items-center justify-center gap-1.5"
                   style={{
                     background: actionStyle.bg,
                     border:     actionStyle.border,
                     color:      actionStyle.color,
+                    opacity:    (!isCurrent && !!loadingPlan && !isLoading) ? 0.5 : undefined,
                   }}>
-                  {isCurrent && <Check size={10} />}
-                  {derivedAction === 'current' ? 'Current Plan'
-                    : derivedAction === 'upgrade' ? 'Upgrade'
-                    : derivedAction === 'downgrade' ? 'Downgrade'
-                    : 'Contact Sales'}
+                  {isLoading
+                    ? <><RefreshCw size={10} className="animate-spin" /> Processing…</>
+                    : isCurrent
+                      ? <><Check size={10} /> Current Plan</>
+                      : derivedAction === 'upgrade' ? 'Upgrade'
+                      : derivedAction === 'downgrade' ? 'Downgrade'
+                      : 'Contact Sales'}
                 </button>
               </div>
             );
@@ -570,7 +617,7 @@ function SettingsModal({ onClose }: { onClose: () => void }) {
 
                 {/* Section content */}
                 {isBilling ? (
-                  <BillingPane onAction={() => setShowBillingToast(true)} />
+                  <BillingPane onContactSales={() => setShowBillingToast(true)} />
                 ) : isBrandKit ? (
                   <BrandKitPane />
                 ) : (
