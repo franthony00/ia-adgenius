@@ -230,6 +230,8 @@ model Workspace {
   learningInsights     LearningInsight[]
   performancePatterns  PerformancePattern[]
   recommendationFeedback RecommendationFeedback[]
+  novaMemories         NovaMemory[]
+  novaFeedback         NovaFeedback[]
 }
 
 model WorkspaceMember {
@@ -547,4 +549,51 @@ model RecommendationFeedback {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, recommendationId])
+}
+
+// ─── Nova Memory System ───────────────────────────────────────────────────────
+
+enum NovaMemoryType {
+  brand_preference
+  accepted_recommendation
+  rejected_recommendation
+  winning_copy
+  winning_cta
+  preferred_style
+  preferred_platform
+  campaign_goal
+  business_context
+  performance_insight
+}
+
+model NovaMemory {
+  id         String         @id @default(cuid())
+  type       NovaMemoryType
+  content    String
+  source     String?
+  confidence Int            @default(50)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  workspaceId String
+  userId      String?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, type])
+}
+
+model NovaFeedback {
+  id          String       @id @default(cuid())
+  messageId   String
+  messageText String
+  feedback    FeedbackType
+  userMessage String?
+  notes       String?
+  createdAt   DateTime     @default(now())
+
+  workspaceId String
+  userId      String?
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
 }

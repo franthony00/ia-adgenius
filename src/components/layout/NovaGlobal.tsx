@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Component, type ReactNode } from 'react';
 
@@ -13,10 +14,10 @@ class NovaBoundary extends Component<{ children: ReactNode }, { failed: boolean 
 }
 
 export default function NovaGlobal() {
-  console.log('[NOVA] rendering floating button');
+  const pathname = usePathname();
   return (
     <NovaBoundary>
-      <NovaChat />
+      <NovaChat currentPage={pathname ?? '/'} />
     </NovaBoundary>
   );
 }

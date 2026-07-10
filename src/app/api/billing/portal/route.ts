@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth';
 import { prisma } from '@/lib/db';

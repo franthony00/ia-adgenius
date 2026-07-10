@@ -409,7 +409,9 @@ function BillingPane({ onContactSales }: { onContactSales: () => void }) {
               : 'upgrade';
             const actionStyle = ACTION_STYLE[derivedAction];
             const isCurrent   = derivedAction === 'current';
-            const badge       = plan.badge && plan.badgeVariant ? BADGE_STYLE[plan.badgeVariant] : null;
+            // Suppress static "Current Plan" badge from mock-data when this is not actually the current plan
+            const showBadge   = plan.badge && plan.badgeVariant && (plan.badge !== 'Current Plan' || isCurrent);
+            const badge       = showBadge ? BADGE_STYLE[plan.badgeVariant!] : null;
             const isLoading   = loadingPlan === plan.id;
 
             function handlePlanClick() {

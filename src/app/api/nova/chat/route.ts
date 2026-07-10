@@ -10,8 +10,32 @@ import {
   type NovaTier,
 } from '@/lib/nova-capabilities';
 
-function buildSystemPrompt(tier: NovaTier): string {
-  return `Eres NOVA, el asistente inteligente de AdGenius. Eres experto en marketing digital, publicidad en redes sociales, copywriting, creación de anuncios y estrategias de crecimiento para marcas.
+interface NovaContext {
+  brandKit?: {
+    businessName?:  string | null;
+    businessType?:  string | null;
+    tone?:          string | null;
+    targetAudience?:string | null;
+    visualStyle?:   string | null;
+    preferredCTAs?: string[];
+    services?:      string[];
+  } | null;
+  memories?: Array<{ type: string; content: string }>;
+  page?: string;
+}
+
+const PAGE_LABELS: Record<string, string> = {
+  '/':               'Dashboard (métricas de campañas en tiempo real)',
+  '/library':        'Ad Library (todos los anuncios del workspace)',
+  '/analysis':       'AI Analysis (análisis IA de cada anuncio)',
+  '/generator':      'Generator (variaciones A/B de copy e imagen)',
+  '/history':        'History (historial de análisis y acciones)',
+  '/meta-connect':   'Ad Platforms (conexión Meta Ads / Google Ads)',
+  '/creative-studio':'Creative Studio (generador de creatividades visuales)',
+};
+
+function buildSystemPrompt(tier: NovaTier, ctx?: NovaContext): string {
+  let base = `Eres NOVA, el asistente inteligente de AdGenius. Eres experto en marketing digital, publicidad en redes sociales, copywriting, creación de anuncios y estrategias de crecimiento para marcas.
 
 ## Sobre AdGenius
 AdGenius es una plataforma de publicidad digital con IA diseñada para ayudar a negocios, marcas y creadores a crear, organizar, analizar y mejorar sus anuncios desde un solo lugar.
@@ -80,6 +104,37 @@ ${tier === 'PRO' ? `**Plan actual: PRO — Acceso completo**
 ✅ Recomendaciones basadas en historial y anuncios ganadores
 ✅ Identificación de patrones de audiencia
 ✅ Alertas de bajo rendimiento y acciones correctivas` : ''}`;
+
+  // ── Inject workspace brand context ─────────────────────────────────────────
+  if (ctx?.brandKit) {
+    const bk = ctx.brandKit;
+    const lines = [
+      bk.businessName  && `- Negocio: ${bk.businessName}`,
+      bk.businessType  && `- Tipo: ${bk.businessType}`,
+      bk.tone          && `- Tono de comunicación: ${bk.tone}`,
+      bk.targetAudience && `- Audiencia objetivo: ${bk.targetAudience}`,
+      bk.visualStyle   && `- Estilo visual preferido: ${bk.visualStyle}`,
+      bk.preferredCTAs?.length && `- CTAs frecuentes: ${bk.preferredCTAs.join(', ')}`,
+      bk.services?.length && `- Servicios: ${bk.services.join(', ')}`,
+    ].filter(Boolean);
+    if (lines.length > 0) {
+      base += `\n\n## Contexto del workspace\nUsa estos datos para personalizar tus respuestas:\n${lines.join('\n')}`;
+    }
+  }
+
+  // ── Inject page context ────────────────────────────────────────────────────
+  if (ctx?.page) {
+    const pageName = PAGE_LABELS[ctx.page] ?? ctx.page;
+    base += `\n\n## Pantalla actual del usuario\nEl usuario está en: **${pageName}**. Cuando sea relevante, adapta tus sugerencias y próximos pasos a lo que puede hacer en esta pantalla.`;
+  }
+
+  // ── Inject learned memories ────────────────────────────────────────────────
+  if (ctx?.memories?.length) {
+    const memLines = ctx.memories.slice(0, 8).map(m => `- ${m.content}`).join('\n');
+    base += `\n\n## Preferencias aprendidas de este workspace\nTen en cuenta estos patrones al hacer recomendaciones:\n${memLines}`;
+  }
+
+  return base;
 }
 
 // Capability key map for intent gating
@@ -283,14 +338,18 @@ export async function POST(req: NextRequest) {
   const tier    = getNovaTier(effectivePlanId);
 
   let message: string;
-  let intent: string | undefined;
+  let intent:  string | undefined;
+  let page:    string | undefined;
   let conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>;
+  let clientMemories: Array<{ type: string; content: string }> = [];
 
   try {
-    const body         = await req.json();
-    message            = String(body.message ?? '').trim();
-    intent             = typeof body.intent === 'string' ? body.intent : undefined;
-    conversationHistory = Array.isArray(body.history) ? body.history : [];
+    const body          = await req.json();
+    message             = String(body.message ?? '').trim();
+    intent              = typeof body.intent   === 'string' ? body.intent   : undefined;
+    page                = typeof body.page     === 'string' ? body.page     : undefined;
+    conversationHistory = Array.isArray(body.history)  ? body.history  : [];
+    clientMemories      = Array.isArray(body.memories) ? body.memories : [];
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
@@ -316,6 +375,23 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Fetch BrandKit for context (non-blocking) ─────────────────────────────
+  let brandKit: NovaContext['brandKit'] = null;
+  if (!authCtx.isDemo) {
+    try {
+      const { prisma } = await import('@/lib/db');
+      brandKit = await prisma.brandKit.findUnique({
+        where:  { workspaceId: authCtx.workspaceId },
+        select: {
+          businessName: true, businessType: true, tone: true,
+          targetAudience: true, visualStyle: true, preferredCTAs: true, services: true,
+        },
+      });
+    } catch { /* BrandKit fetch is best-effort */ }
+  }
+
+  const novaCtx: NovaContext = { brandKit, memories: clientMemories, page };
+
   const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
@@ -328,7 +404,7 @@ export async function POST(req: NextRequest) {
   }
 
   const client       = new Anthropic({ apiKey });
-  const systemPrompt = buildSystemPrompt(tier);
+  const systemPrompt = buildSystemPrompt(tier, novaCtx);
 
   // Keep last 10 turns for context window efficiency
   const recentHistory = conversationHistory.slice(-10);

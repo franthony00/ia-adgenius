@@ -1,3 +1,5 @@
+export const runtime = 'nodejs';
+
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthContext } from '@/lib/auth';
 import { prisma } from '@/lib/db';
@@ -5,12 +7,21 @@ import { getStripe, STRIPE_PRICE_MAP } from '@/lib/stripe';
 import type { PlanId } from '@/lib/types';
 
 export async function POST(req: NextRequest) {
+  let planId: PlanId | undefined;
   try {
-    const { planId } = (await req.json()) as { planId: PlanId };
+    ({ planId } = (await req.json()) as { planId: PlanId });
 
-    if (!STRIPE_PRICE_MAP[planId]) {
+    const priceId = STRIPE_PRICE_MAP[planId];
+
+    if (!priceId) {
+      console.error('[BILLING_CHECKOUT_ERROR]', {
+        planId,
+        hasStripeSecretKey: Boolean(process.env.STRIPE_SECRET_KEY),
+        hasPriceId: false,
+        stripeError: `Missing Stripe price ID for plan: ${planId}`,
+      });
       return NextResponse.json(
-        { error: 'Plan not available for online checkout. Please contact sales.' },
+        { error: `Missing Stripe price ID for plan: ${planId}` },
         { status: 400 },
       );
     }
@@ -45,27 +56,33 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+    const origin = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
     const session = await getStripe().checkout.sessions.create({
       customer:             customerId,
       mode:                 'subscription',
       payment_method_types: ['card'],
       line_items: [{
-        price:    STRIPE_PRICE_MAP[planId]!,
+        price:    priceId,
         quantity: 1,
       }],
       subscription_data: {
         trial_period_days: 7,
         metadata: { workspaceId: ctx.workspaceId, planId },
       },
-      success_url: `${appUrl}/?billing=success`,
-      cancel_url:  `${appUrl}/?billing=cancelled`,
+      success_url: `${origin}/settings?billing=success`,
+      cancel_url:  `${origin}/settings?billing=cancelled`,
     });
 
     return NextResponse.json({ url: session.url });
   } catch (err) {
-    console.error('[billing/checkout]', err);
+    const error = err instanceof Error ? err : new Error(String(err));
+    console.error('[BILLING_CHECKOUT_ERROR]', {
+      planId,
+      hasStripeSecretKey: Boolean(process.env.STRIPE_SECRET_KEY),
+      hasPriceId: Boolean(planId && STRIPE_PRICE_MAP[planId]),
+      stripeError: error.message,
+    });
     return NextResponse.json({ error: 'Failed to create checkout session.' }, { status: 500 });
   }
 }
