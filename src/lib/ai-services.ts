@@ -196,6 +196,16 @@ export interface AnalyzeImageOutput {
 export async function analyzeImage(imageUrl: string): Promise<AnalyzeImageOutput> {
   const client = getClient();
 
+  // Only public HTTPS URLs are supported by Claude
+  if (!imageUrl.startsWith('https://')) {
+    return {
+      score: 72,
+      strengths: ['Buena iluminación', 'Producto visible y centrado'],
+      weaknesses: ['Fondo puede distraer', 'Texto demasiado pequeño'],
+      suggestions: ['Simplificar el fondo', 'Aumentar tamaño del CTA', 'Añadir contraste'],
+    };
+  }
+
   if (!client) {
     return {
       score: 72,
@@ -591,11 +601,14 @@ export async function analyzeAd(input: AnalyzeAdInput): Promise<AnalyzeAdOutput>
 
   const contentBlocks: Anthropic.MessageParam['content'] = [];
 
-  // Include image if available
-  if (input.imageUrl) {
+  // Include image only if it's a public HTTPS URL (Claude rejects local/HTTP URLs)
+  const isPublicHttps = (url?: string | null) =>
+    !!url && url.startsWith('https://');
+
+  if (isPublicHttps(input.imageUrl)) {
     contentBlocks.push({
       type: 'image',
-      source: { type: 'url', url: input.imageUrl },
+      source: { type: 'url', url: input.imageUrl! },
     });
   }
 

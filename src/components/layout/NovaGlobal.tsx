@@ -13,8 +13,16 @@ class NovaBoundary extends Component<{ children: ReactNode }, { failed: boolean 
   render() { return this.state.failed ? null : this.props.children; }
 }
 
+const PUBLIC_PATHS = ['/', '/pricing', '/sign-in', '/sign-up'];
+
 export default function NovaGlobal() {
   const pathname = usePathname();
+
+  // Don't show Nova on public/marketing pages
+  if (PUBLIC_PATHS.some(p => pathname === p || pathname?.startsWith(p + '/'))) {
+    return null;
+  }
+
   return (
     <NovaBoundary>
       <NovaChat currentPage={pathname ?? '/'} />

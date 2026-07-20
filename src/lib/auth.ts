@@ -6,7 +6,10 @@ export const DEMO_USER_ID      = 'demo-user';
 export const DEMO_WORKSPACE_ID = 'demo-workspace';
 
 /** Emails that bypass all plan gates and get enterprise-level access. */
-export const ADMIN_EMAILS = ['franthony007@gmail.com'];
+export const ADMIN_EMAILS: string[] = (process.env.ADMIN_EMAILS ?? '')
+  .split(',')
+  .map(e => e.trim())
+  .filter(Boolean);
 
 export interface AuthContext {
   userId: string;

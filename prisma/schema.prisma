@@ -217,6 +217,16 @@ model Workspace {
   slug             String   @unique
   logoUrl          String?
   stripeCustomerId String?  @unique
+  // Workspace preferences
+  timezone         String?
+  currency         String?
+  // AI model preferences
+  aiModel          String?
+  aiTemperature    Float?
+  // Notification preferences (stored as JSON)
+  notifChannels    Json?
+  notifEvents      Json?
+  slackWebhookUrl  String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 

@@ -10,6 +10,38 @@ import {
   type NovaTier,
 } from '@/lib/nova-capabilities';
 
+// ── In-memory rate limiter ────────────────────────────────────────────────────
+// Limits per user per hour. Resets on new serverless instance / deployment.
+// For stricter enforcement across instances, replace with Upstash Redis.
+const RATE_LIMIT_PER_HOUR: Record<string, number> = {
+  FREE:       10,
+  PLUS:       40,
+  PRO:       100,
+  ADMIN:    9999,
+};
+
+const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+function checkRateLimit(userId: string, tier: NovaTier, isAdmin: boolean): { allowed: boolean; remaining: number; resetAt: number } {
+  const limit     = isAdmin ? RATE_LIMIT_PER_HOUR.ADMIN : (RATE_LIMIT_PER_HOUR[tier] ?? 10);
+  const now       = Date.now();
+  const windowMs  = 60 * 60 * 1000; // 1 hour
+  const key       = `nova:${userId}`;
+  const entry     = rateLimitStore.get(key);
+
+  if (!entry || now > entry.resetAt) {
+    rateLimitStore.set(key, { count: 1, resetAt: now + windowMs });
+    return { allowed: true, remaining: limit - 1, resetAt: now + windowMs };
+  }
+
+  if (entry.count >= limit) {
+    return { allowed: false, remaining: 0, resetAt: entry.resetAt };
+  }
+
+  entry.count += 1;
+  return { allowed: true, remaining: limit - entry.count, resetAt: entry.resetAt };
+}
+
 interface NovaContext {
   brandKit?: {
     businessName?:  string | null;
@@ -23,6 +55,12 @@ interface NovaContext {
   memories?: Array<{ type: string; content: string }>;
   page?: string;
 }
+
+// Allowlist of valid page values — prevents prompt injection via body.page
+const ALLOWED_PAGES = new Set([
+  '/', '/library', '/analysis', '/generator',
+  '/history', '/meta-connect', '/creative-studio',
+]);
 
 const PAGE_LABELS: Record<string, string> = {
   '/':               'Dashboard (métricas de campañas en tiempo real)',
@@ -337,6 +375,24 @@ export async function POST(req: NextRequest) {
   const caps    = getNovaCapabilities(effectivePlanId);
   const tier    = getNovaTier(effectivePlanId);
 
+  // ── Rate limiting ─────────────────────────────────────────────────────────
+  const rl = checkRateLimit(authCtx.userId, tier, authCtx.isAdmin);
+  if (!rl.allowed) {
+    const resetIn = Math.ceil((rl.resetAt - Date.now()) / 60_000);
+    return NextResponse.json(
+      { error: `Límite de mensajes alcanzado. Reinicia en ${resetIn} min.`, rateLimited: true },
+      {
+        status: 429,
+        headers: {
+          'X-RateLimit-Limit':     String(RATE_LIMIT_PER_HOUR[tier] ?? 10),
+          'X-RateLimit-Remaining': '0',
+          'X-RateLimit-Reset':     String(Math.ceil(rl.resetAt / 1000)),
+          'Retry-After':           String(resetIn * 60),
+        },
+      },
+    );
+  }
+
   let message: string;
   let intent:  string | undefined;
   let page:    string | undefined;
@@ -345,11 +401,27 @@ export async function POST(req: NextRequest) {
 
   try {
     const body          = await req.json();
-    message             = String(body.message ?? '').trim();
-    intent              = typeof body.intent   === 'string' ? body.intent   : undefined;
-    page                = typeof body.page     === 'string' ? body.page     : undefined;
-    conversationHistory = Array.isArray(body.history)  ? body.history  : [];
-    clientMemories      = Array.isArray(body.memories) ? body.memories : [];
+    message             = String(body.message ?? '').slice(0, 4000).trim();
+    intent              = typeof body.intent === 'string' ? body.intent : undefined;
+    // Validate page against allowlist to prevent prompt injection
+    page                = typeof body.page === 'string' && ALLOWED_PAGES.has(body.page) ? body.page : undefined;
+    // Sanitize history: cap turns and content length to prevent token abuse
+    conversationHistory = (Array.isArray(body.history) ? body.history : [])
+      .slice(-10)
+      .map((m: unknown) => {
+        const turn = m as Record<string, unknown>;
+        return {
+          role:    turn.role === 'assistant' ? 'assistant' : 'user',
+          content: String(turn.content ?? '').slice(0, 2000),
+        } as { role: 'user' | 'assistant'; content: string };
+      });
+    // Memories come from client but are injected into system prompt — cap them
+    clientMemories = (Array.isArray(body.memories) ? body.memories : [])
+      .slice(0, 8)
+      .map((m: unknown) => {
+        const mem = m as Record<string, unknown>;
+        return { type: String(mem.type ?? ''), content: String(mem.content ?? '').slice(0, 200) };
+      });
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
   }
@@ -423,11 +495,10 @@ export async function POST(req: NextRequest) {
 
   try {
     const stream = client.messages.stream({
-      model:    'claude-opus-4-6',
+      model:      'claude-sonnet-4-6',
       max_tokens: maxTokens,
-      system:   systemPrompt,
+      system:     systemPrompt,
       messages,
-      thinking: { type: 'adaptive' },
     });
 
     const encoder = new TextEncoder();
@@ -442,6 +513,11 @@ export async function POST(req: NextRequest) {
               controller.enqueue(encoder.encode(event.delta.text));
             }
           }
+        } catch (streamErr) {
+          console.error('[nova/chat stream error]', streamErr);
+          // Emit fallback text so the bubble is never empty
+          const fallback = getDemoReply(message, tier, intent);
+          controller.enqueue(encoder.encode(fallback));
         } finally {
           controller.close();
         }
@@ -458,7 +534,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error('[POST /api/nova/chat]', err);
-    // Anthropic unavailable — fall back to demo silently instead of showing an error
     return NextResponse.json({
       reply: getDemoReply(message, tier, intent),
       mode:  'demo',
