@@ -20,6 +20,8 @@ export default function LibraryPage() {
   const [ads, setAds]               = useState<Ad[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
   const [showModal, setShowModal]   = useState(false);
+  const [editAd, setEditAd]         = useState<Ad | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [view, setView]             = useState<ViewMode>('grid');
   const [platform, setPlatform]     = useState<Platform | 'all'>('all');
   const [status, setStatus]         = useState<AdStatus | 'all'>('all');
@@ -54,6 +56,20 @@ export default function LibraryPage() {
   const handleAdd = (newAd: Ad) => {
     setAds(prev => [newAd, ...prev]);
   };
+
+  async function handleDelete(id: string) {
+    setDeletingId(id);
+    try {
+      const res = await fetch(`/api/ads/${id}`, { method: 'DELETE' });
+      if (res.ok) setAds(prev => prev.filter(a => a.id !== id));
+    } catch { /* silent */ } finally {
+      setDeletingId(null);
+    }
+  }
+
+  function handleUpdate(updated: Ad) {
+    setAds(prev => prev.map(a => a.id === updated.id ? updated : a));
+  }
 
   return (
     <AppLayout>
@@ -153,7 +169,14 @@ export default function LibraryPage() {
               ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
               : 'grid-cols-1')}>
             {filtered.map((ad, i) => (
-              <AdCard key={ad.id} ad={ad} delay={i * 40} />
+              <AdCard
+                key={ad.id}
+                ad={ad}
+                delay={i * 40}
+                onEdit={() => setEditAd(ad)}
+                onDelete={() => handleDelete(ad.id)}
+                isDeleting={deletingId === ad.id}
+              />
             ))}
           </div>
         ) : (
@@ -169,11 +192,20 @@ export default function LibraryPage() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* Add Modal */}
       {showModal && (
         <AddAdModal
           onClose={() => setShowModal(false)}
           onAdd={handleAdd}
+        />
+      )}
+
+      {/* Edit Modal */}
+      {editAd && (
+        <AddAdModal
+          editAd={editAd}
+          onClose={() => setEditAd(null)}
+          onAdd={updated => { handleUpdate(updated); setEditAd(null); }}
         />
       )}
     </AppLayout>

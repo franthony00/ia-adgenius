@@ -5,6 +5,8 @@ import { getAuthContext } from '@/lib/auth';
 import { mapVariation } from '@/lib/services/mappers';
 import { mockVariations } from '@/lib/mock-data';
 import { hasFeature } from '@/lib/plan-gates';
+import { sendWorkspaceEmail } from '@/lib/email';
+import { variationSaved } from '@/lib/email-templates';
 // UI string → Prisma enum value
 function unmapAngle(a: string | undefined): string | null {
   if (!a) return null;
@@ -111,6 +113,13 @@ export async function POST(req: Request) {
         relatedAdId: originalAdId,
       },
     });
+    // Fire-and-forget email notification
+    sendWorkspaceEmail(
+      authCtx.workspaceId,
+      'variation',
+      variationSaved(dbAd.name, created.length, originalAdId),
+    );
+
     return NextResponse.json({ variations: created.map(mapVariation), source: 'db' });
   } catch (err) {
     console.error('[POST /api/variations]', err);

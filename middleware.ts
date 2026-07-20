@@ -1,14 +1,14 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 
-const isProtectedRoute = createRouteMatcher([
+// Explicitly declare public routes — everything else requires auth
+const isPublicRoute = createRouteMatcher([
   '/',
-  '/library(.*)',
-  '/analysis(.*)',
-  '/generator(.*)',
-  '/history(.*)',
-  '/meta-connect(.*)',
-  '/ads(.*)',
+  '/pricing(.*)',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/api/webhooks(.*)',
+  '/api/billing/webhook',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
@@ -24,7 +24,7 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.next();
   }
 
-  if (isProtectedRoute(req)) {
+  if (!isPublicRoute(req)) {
     await auth.protect();
   }
 });

@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getStripe, planFromPriceId, mapStripeStatus } from '@/lib/stripe';
 import { prisma } from '@/lib/db';
+import { sendWorkspaceEmail } from '@/lib/email';
+import {
+  billingWelcome,
+  billingTrialEnding,
+  billingPaymentFailed,
+  billingCancelled,
+} from '@/lib/email-templates';
 
 export const runtime = 'nodejs';
 
@@ -71,14 +78,37 @@ export async function POST(req: NextRequest) {
             sub.metadata = { ...sub.metadata, workspaceId: session.metadata.workspaceId };
           }
           await upsertSubscription(sub);
+          const workspaceId = sub.metadata?.workspaceId;
+          if (workspaceId) {
+            const item    = sub.items.data[0];
+            const priceId = item?.price?.id ?? null;
+            const planId  = (priceId ? planFromPriceId(priceId) : null) ?? 'pro';
+            const planName = planId.charAt(0).toUpperCase() + planId.slice(1);
+            sendWorkspaceEmail(workspaceId, 'billing_welcome', billingWelcome(planName));
+          }
         }
         break;
       }
 
-      case 'customer.subscription.updated':
+      case 'customer.subscription.updated': {
+        const sub = event.data.object as Stripe.Subscription;
+        await upsertSubscription(sub);
+        break;
+      }
+
       case 'customer.subscription.trial_will_end': {
         const sub = event.data.object as Stripe.Subscription;
         await upsertSubscription(sub);
+        const workspaceId = sub.metadata?.workspaceId;
+        if (workspaceId) {
+          const trialEnd   = sub.trial_end ?? 0;
+          const daysLeft   = Math.max(1, Math.ceil((trialEnd * 1000 - Date.now()) / 86_400_000));
+          const item       = sub.items.data[0];
+          const priceId    = item?.price?.id ?? null;
+          const planId     = (priceId ? planFromPriceId(priceId) : null) ?? 'pro';
+          const planName   = planId.charAt(0).toUpperCase() + planId.slice(1);
+          sendWorkspaceEmail(workspaceId, 'billing_trial_ending', billingTrialEnding(planName, daysLeft));
+        }
         break;
       }
 
@@ -90,6 +120,11 @@ export async function POST(req: NextRequest) {
             where: { workspaceId },
             data:  { status: 'cancelled', cancelAtPeriodEnd: false },
           });
+          const item     = sub.items.data[0];
+          const priceId  = item?.price?.id ?? null;
+          const planId   = (priceId ? planFromPriceId(priceId) : null) ?? 'pro';
+          const planName = planId.charAt(0).toUpperCase() + planId.slice(1);
+          sendWorkspaceEmail(workspaceId, 'billing_cancelled', billingCancelled(planName));
         }
         break;
       }
@@ -106,10 +141,18 @@ export async function POST(req: NextRequest) {
               : subDetails.subscription.id)
           : null;
         if (subId) {
+          const sub = await prisma.subscription.findUnique({
+            where:  { stripeSubscriptionId: subId },
+            select: { workspaceId: true, planId: true },
+          });
           await prisma.subscription.updateMany({
             where: { stripeSubscriptionId: subId },
             data:  { status: 'past_due' },
           });
+          if (sub) {
+            const planName = sub.planId.charAt(0).toUpperCase() + sub.planId.slice(1);
+            sendWorkspaceEmail(sub.workspaceId, 'billing_payment_failed', billingPaymentFailed(planName));
+          }
         }
         break;
       }

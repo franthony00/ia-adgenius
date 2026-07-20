@@ -6,6 +6,8 @@ import { mapAnalysis } from '@/lib/services/mappers';
 import { mockAnalyses } from '@/lib/mock-data';
 import { analyzeAd } from '@/lib/ai-services';
 import { hasFeature } from '@/lib/plan-gates';
+import { sendWorkspaceEmail } from '@/lib/email';
+import { analysisDone } from '@/lib/email-templates';
 
 // ─── GET /api/analyses ─────────────────────────────────────────────────────────
 
@@ -151,6 +153,13 @@ export async function POST(req: NextRequest) {
       where: { id: ad.id },
       data:  { aiScore: result.overallScore },
     });
+
+    // Fire-and-forget email notification
+    sendWorkspaceEmail(
+      authCtx.workspaceId,
+      'analysis_done',
+      analysisDone(ad.name, result.overallScore, ad.id),
+    );
 
     return NextResponse.json({ analysis: mapAnalysis(saved), source: 'ai' });
   } catch (err) {

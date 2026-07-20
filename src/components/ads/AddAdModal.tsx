@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Plus, ImageIcon, AlertCircle } from 'lucide-react';
+import { X, Plus, Pencil, ImageIcon, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Ad, Platform, AdStatus } from '@/lib/types';
 
 interface AddAdModalProps {
   onClose: () => void;
   onAdd: (ad: Ad) => void;
+  editAd?: Ad;
 }
 
 interface FormState {
@@ -110,12 +111,35 @@ function generateId() {
 
 const PLACEHOLDER_IMAGE = '/ads/tech.svg';
 
-export default function AddAdModal({ onClose, onAdd }: AddAdModalProps) {
-  const [form, setForm] = useState<FormState>({
-    name: '', platform: 'facebook', status: 'draft',
-    campaign: '', headline: '', description: '', cta: 'Learn More',
-    imageUrl: '', tags: '', budget: '',
-    ctr: '', cpc: '', cpa: '', roas: '', impressions: '', conversions: '',
+export default function AddAdModal({ onClose, onAdd, editAd }: AddAdModalProps) {
+  const isEdit = !!editAd;
+  const [form, setForm] = useState<FormState>(() => {
+    if (editAd) {
+      return {
+        name:        editAd.name,
+        platform:    editAd.platform,
+        status:      editAd.status,
+        campaign:    editAd.campaign,
+        headline:    editAd.headline,
+        description: editAd.description,
+        cta:         editAd.cta,
+        imageUrl:    editAd.imageUrl || '',
+        tags:        editAd.tags.join(', '),
+        budget:      editAd.budget > 0 ? String(editAd.budget) : '',
+        ctr:         editAd.metrics.ctr   > 0 ? String(editAd.metrics.ctr)         : '',
+        cpc:         editAd.metrics.cpc   > 0 ? String(editAd.metrics.cpc)         : '',
+        cpa:         editAd.metrics.cpa   > 0 ? String(editAd.metrics.cpa)         : '',
+        roas:        editAd.metrics.roas  > 0 ? String(editAd.metrics.roas)        : '',
+        impressions: editAd.metrics.impressions > 0 ? String(editAd.metrics.impressions) : '',
+        conversions: editAd.metrics.conversions > 0 ? String(editAd.metrics.conversions) : '',
+      };
+    }
+    return {
+      name: '', platform: 'facebook', status: 'draft',
+      campaign: '', headline: '', description: '', cta: 'Learn More',
+      imageUrl: '', tags: '', budget: '',
+      ctr: '', cpc: '', cpa: '', roas: '', impressions: '', conversions: '',
+    };
   });
   const [errors, setErrors] = useState<Partial<Record<keyof FormState, string>>>({});
   const [activeSection, setActiveSection] = useState<'basic' | 'metrics'>('basic');
@@ -182,28 +206,33 @@ export default function AddAdModal({ onClose, onAdd }: AddAdModalProps) {
 
     setSaving(true);
     try {
-      const res = await fetch('/api/ads', {
-        method:  'POST',
+      const payload = {
+        name:        form.name.trim(),
+        platform:    form.platform,
+        status:      form.status,
+        campaign:    form.campaign.trim(),
+        headline:    form.headline.trim(),
+        description: form.description.trim(),
+        cta:         form.cta.trim() || 'Learn More',
+        imageUrl:    form.imageUrl.trim() || null,
+        budget:      parseFloat(form.budget) || 0,
+        metrics: {
+          ctr:         parseFloat(form.ctr)       || 0,
+          cpc:         parseFloat(form.cpc)       || 0,
+          cpa:         parseFloat(form.cpa)       || 0,
+          roas:        parseFloat(form.roas)      || 0,
+          impressions: parseInt(form.impressions) || 0,
+          conversions: parseInt(form.conversions) || 0,
+        },
+      };
+
+      const url    = isEdit ? `/api/ads/${editAd!.id}` : '/api/ads';
+      const method = isEdit ? 'PATCH' : 'POST';
+
+      const res = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name:        form.name.trim(),
-          platform:    form.platform,
-          status:      form.status,
-          campaign:    form.campaign.trim(),
-          headline:    form.headline.trim(),
-          description: form.description.trim(),
-          cta:         form.cta.trim() || 'Learn More',
-          imageUrl:    form.imageUrl.trim() || null,
-          budget:      parseFloat(form.budget) || 0,
-          metrics: {
-            ctr:         parseFloat(form.ctr)       || 0,
-            cpc:         parseFloat(form.cpc)       || 0,
-            cpa:         parseFloat(form.cpa)       || 0,
-            roas:        parseFloat(form.roas)      || 0,
-            impressions: parseInt(form.impressions) || 0,
-            conversions: parseInt(form.conversions) || 0,
-          },
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (res.ok) {
@@ -219,7 +248,44 @@ export default function AddAdModal({ onClose, onAdd }: AddAdModalProps) {
     }
 
     // Local fallback (demo mode or network error)
-    onAdd(buildLocalAd());
+    if (isEdit) {
+      // For edit in demo/error, construct updated ad from existing
+      const now = new Date().toISOString();
+      const spend = parseFloat(form.budget) || 0;
+      const ctr   = parseFloat(form.ctr)    || 0;
+      const cpc   = parseFloat(form.cpc)    || 0;
+      const cpa   = parseFloat(form.cpa)    || 0;
+      const roas  = parseFloat(form.roas)   || 0;
+      const impr  = parseInt(form.impressions) || 0;
+      const conv  = parseInt(form.conversions) || 0;
+      const updatedAd: Ad = {
+        ...editAd!,
+        name:        form.name.trim(),
+        platform:    form.platform,
+        status:      form.status,
+        campaign:    form.campaign.trim(),
+        headline:    form.headline.trim(),
+        description: form.description.trim(),
+        cta:         form.cta.trim() || 'Learn More',
+        imageUrl:    form.imageUrl.trim() || editAd!.imageUrl,
+        budget:      parseFloat(form.budget) || 0,
+        updatedAt:   now,
+        metrics: {
+          ...editAd!.metrics,
+          ctr, cpc, cpa, roas,
+          impressions: impr,
+          conversions: conv,
+          clicks:   Math.round(impr * (ctr / 100)),
+          reach:    Math.round(impr * 0.85),
+          spend,
+          revenue:  spend * (roas || 1),
+          cpm:      impr > 0 ? (spend / impr) * 1000 : 0,
+        },
+      };
+      onAdd(updatedAd);
+    } else {
+      onAdd(buildLocalAd());
+    }
     onClose();
   };
 
@@ -245,11 +311,11 @@ export default function AddAdModal({ onClose, onAdd }: AddAdModalProps) {
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: 'linear-gradient(135deg,#10B981,#059669)' }}>
-              <Plus size={15} className="text-white" />
+              {isEdit ? <Pencil size={15} className="text-white" /> : <Plus size={15} className="text-white" />}
             </div>
             <div>
-              <h2 className="text-sm font-bold text-white">Add New Ad</h2>
-              <p className="text-[10px] text-zinc-500">Fill in the details to add it to your library</p>
+              <h2 className="text-sm font-bold text-white">{isEdit ? 'Edit Ad' : 'Add New Ad'}</h2>
+              <p className="text-[10px] text-zinc-500">{isEdit ? 'Update the ad details in your library' : 'Fill in the details to add it to your library'}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-colors">
@@ -438,8 +504,8 @@ export default function AddAdModal({ onClose, onAdd }: AddAdModalProps) {
               style={{ background: 'linear-gradient(135deg,#10B981,#059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.25)' }}>
               {saving
                 ? <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                : <Plus size={14} />}
-              {saving ? 'Saving…' : 'Add to Library'}
+                : isEdit ? <Pencil size={14} /> : <Plus size={14} />}
+              {saving ? 'Saving…' : isEdit ? 'Save Changes' : 'Add to Library'}
             </button>
           </div>
         </div>

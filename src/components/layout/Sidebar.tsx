@@ -25,6 +25,7 @@ const NAV = [
   { href: '/analysis',     icon: BarChart3,        label: 'AI Analysis',  badge: String(mockAnalyses.length) },
   { href: '/generator',    icon: Sparkles,         label: 'Generator',    badge: null },
   { href: '/history',      icon: History,          label: 'History',      badge: null },
+  { href: '/insights',     icon: Brain,            label: 'Insights',     badge: null },
   { href: '/meta-connect',     icon: Globe,    label: 'Ad Platforms',   badge: null },
   { href: '/creative-studio',  icon: Palette,  label: 'Creative Studio', badge: null },
 ];

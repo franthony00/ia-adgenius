@@ -118,6 +118,18 @@ export default function DashboardPage() {
     data, isLoading, error, isDemoMode, refresh,
   } = useDashboardData();
 
+  const [seeding, setSeeding] = React.useState(false);
+
+  async function handleSeedDemo() {
+    setSeeding(true);
+    try {
+      const res = await fetch('/api/workspace/seed-demo', { method: 'POST' });
+      if (res.ok) refresh();
+    } catch { /* silent */ } finally {
+      setSeeding(false);
+    }
+  }
+
   const variationsByAd = mockVariations.reduce<Record<string, number>>((acc, v) => {
     acc[v.originalAdId] = (acc[v.originalAdId] ?? 0) + 1;
     return acc;
@@ -178,21 +190,43 @@ export default function DashboardPage() {
         title="Dashboard"
         subtitle="Performance overview — last 7 days"
         onRefresh={refresh}
+        action={
+          !isLoading && data ? (
+            <div
+              className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-semibold"
+              style={isDemoMode
+                ? { background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)', color: '#FCD34D' }
+                : { background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)', color: '#34D399' }
+              }>
+              <span className={`w-1.5 h-1.5 rounded-full ${isDemoMode ? 'bg-amber-400' : 'bg-emerald-400 animate-pulse'}`} />
+              {isDemoMode ? 'Sample Data' : 'Live Data'}
+            </div>
+          ) : null
+        }
       />
 
       {/* ── Demo mode banner ── */}
       {isDemoMode && (
-        <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 flex items-center gap-3 px-4 py-3 rounded-xl"
+        <div className="mx-4 sm:mx-6 lg:mx-8 mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 px-4 py-3 rounded-xl"
           style={{ background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)' }}>
-          <Info size={14} className="text-amber-400 shrink-0" />
+          <Info size={14} className="text-amber-400 shrink-0 mt-0.5 sm:mt-0" />
           <p className="text-xs text-amber-300/80 flex-1">
-            <span className="font-semibold text-amber-300">Demo mode</span>
-            {' '}— showing sample data. Connect Meta Ads or Google Ads in{' '}
-            <Link href="/meta-connect" className="underline underline-offset-2 hover:text-amber-200 transition-colors">
-              Ad Platforms
+            <span className="font-semibold text-amber-300">Sample data</span>
+            {' '}— add your own ads in{' '}
+            <Link href="/library" className="underline underline-offset-2 hover:text-amber-200 transition-colors">
+              Ad Library
             </Link>
             {' '}to see your real performance.
           </p>
+          <button
+            onClick={handleSeedDemo}
+            disabled={seeding}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-colors shrink-0 disabled:opacity-50"
+            style={{ background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)', color: '#FCD34D' }}>
+            {seeding
+              ? <><RefreshCw size={10} className="animate-spin" /> Loading…</>
+              : '⚡ Load sample data'}
+          </button>
         </div>
       )}
 
